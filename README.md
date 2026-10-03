@@ -152,6 +152,43 @@ Visit **`http://localhost:3000`** in your browser.
 
 ---
 
+## ☁️ Deploy to Render
+
+Evidex is fully pre-configured for zero-friction cloud deployment on [Render](https://render.com).
+
+### Method 1: Using Render Blueprints (Recommended — 1-Click Setup)
+1. Fork or push this repository to your GitHub account (`https://github.com/Jamal-Khan-I/Evidex`).
+2. Go to your [Render Dashboard](https://dashboard.render.com).
+3. Click **New +** → **Blueprint**.
+4. Connect your `Evidex` repository. Render will automatically detect the [`render.yaml`](render.yaml) specification file.
+5. In the configuration prompt, enter your `PINATA_JWT` (or leave it to add later in environment variables).
+6. Click **Apply**. Render will build and deploy your live full-stack instance!
+
+### Method 2: Manual Web Service Setup
+1. On [Render Dashboard](https://dashboard.render.com), click **New +** → **Web Service**.
+2. Select **Build and deploy from a Git repository** and pick `Evidex`.
+3. Configure the following fields:
+   * **Name:** `evidex` (or your choice)
+   * **Region:** Any (e.g. `Oregon (US West)` or `Frankfurt (EU)`)
+   * **Branch:** `main`
+   * **Runtime:** `Node`
+   * **Build Command:** `npm install`
+   * **Start Command:** `npm start`
+   * **Plan:** `Free`
+4. Expand **Advanced** → **Environment Variables** and add:
+   | Key | Recommended Value | Description |
+   | :--- | :--- | :--- |
+   | `NODE_VERSION` | `22` | Required for native `node:sqlite` runtime |
+   | `NODE_ENV` | `production` | Production environment flag |
+   | `DEFAULT_CONTRACT_ADDRESS` | `0x2d8830D1857ff9304aB754E4AcCDE2218B04Dd6b` | Deployed Sepolia contract |
+   | `DEFAULT_NETWORK_NAME` | `Sepolia` | Target Ethereum network |
+   | `DEFAULT_CHAIN_ID` | `11155111` | Sepolia chain ID |
+   | `RPC_URL` | `https://rpc.sepolia.org` | Ethereum RPC provider |
+   | `PINATA_JWT` | `your_pinata_jwt_here` | IPFS pinning token |
+5. Click **Deploy Web Service**. Once deployed, Render provides your live `https://evidex.onrender.com` URL with automatic SSL/TLS!
+
+---
+
 ## 📂 Repository Structure
 
 ```

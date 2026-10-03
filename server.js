@@ -9,7 +9,7 @@ db.getDb();
 
 const server = http.createServer(app);
 
-server.listen(config.port, () => {
+server.listen(config.port, '0.0.0.0', () => {
   console.log('╔═══════════════════════════════════════════════════════════════╗');
   console.log('║       EVIDENCE PROTECTION SYSTEM — FULL STACK SERVER          ║');
   console.log('╚═══════════════════════════════════════════════════════════════╝');

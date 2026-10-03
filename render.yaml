@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: evidex
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: NODE_ENV
+        value: production
+      - key: DEFAULT_CONTRACT_ADDRESS
+        value: 0x2d8830D1857ff9304aB754E4AcCDE2218B04Dd6b
+      - key: DEFAULT_NETWORK_NAME
+        value: Sepolia
+      - key: DEFAULT_CHAIN_ID
+        value: 11155111
+      - key: RPC_URL
+        value: https://rpc.sepolia.org
+      - key: PINATA_JWT
+        sync: false
