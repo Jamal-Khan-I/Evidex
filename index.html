@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Evidex | Blockchain Digital Evidence Protection</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500..800;1,9..144,500..800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <div class="brand">
+      <div class="brand-mark flame-vortex-logo" title="Evidex">
+        <svg class="flame-vortex-svg" width="34" height="34" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Group 1: Primary clockwise swirling flame filaments -->
+          <g class="vortex-layer cw-primary">
+            <!-- Outer undulating flame lobes (wavy, NOT a pure circle) -->
+            <path d="M50 5 C72 3, 95 16, 94 45 C93 75, 78 96, 48 95 C20 94, 4 75, 6 46 C8 18, 26 7, 50 5" 
+                  stroke="#000000" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="78 32" opacity="0.95"/>
+            <path d="M52 10 C74 12, 90 26, 89 52 C88 77, 69 90, 50 89 C26 88, 10 71, 12 48 C14 24, 30 8, 52 10" 
+                  stroke="#000000" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="58 42" opacity="0.8"/>
+            <path d="M46 7 C68 5, 97 22, 96 50 C95 79, 73 97, 46 93 C22 89, 3 72, 5 45 C7 17, 24 9, 46 7" 
+                  stroke="#000000" stroke-width="1.3" stroke-linecap="round" stroke-dasharray="42 58" opacity="0.65"/>
+            <path d="M54 20 C70 23, 80 36, 79 52 C78 68, 66 80, 48 79 C32 78, 20 65, 22 50 C24 33, 36 19, 54 20" 
+                  stroke="#000000" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="36 34" opacity="0.75"/>
+            <path d="M49 14 C66 12, 86 24, 87 48 C88 70, 74 86, 52 85 C30 84, 14 70, 16 48 C18 28, 32 16, 49 14"
+                  stroke="#000000" stroke-width="1.1" stroke-linecap="round" stroke-dasharray="50 50" opacity="0.55"/>
+            <path d="M53 24 C65 26, 75 36, 74 50 C73 64, 62 74, 48 73 C36 72, 26 62, 27 48 C28 36, 39 23, 53 24"
+                  stroke="#000000" stroke-width="1.4" stroke-linecap="round" stroke-dasharray="28 42" opacity="0.7"/>
+          </g>
+
+          <!-- Group 2: Counter-clockwise weaving flame filaments (plasma wave interference) -->
+          <g class="vortex-layer ccw-stream">
+            <path d="M50 95 C77 93, 96 73, 95 48 C94 21, 73 4, 48 6 C20 8, 5 28, 6 53 C7 79, 25 97, 50 95" 
+                  stroke="#000000" stroke-width="2.3" stroke-linecap="round" stroke-dasharray="82 28" opacity="0.9"/>
+            <path d="M48 89 C71 88, 88 73, 87 50 C86 26, 71 10, 48 11 C24 12, 9 29, 11 54 C13 78, 28 90, 48 89" 
+                  stroke="#000000" stroke-width="1.7" stroke-linecap="round" stroke-dasharray="48 52" opacity="0.75"/>
+            <path d="M52 97 C22 99, 3 78, 4 47 C5 18, 25 3, 52 4 C79 5, 98 25, 97 53 C96 81, 78 96, 52 97" 
+                  stroke="#000000" stroke-width="1.2" stroke-linecap="round" stroke-dasharray="32 68" opacity="0.5"/>
+            <path d="M46 79 C30 77, 19 65, 21 48 C23 31, 35 19, 52 21 C68 23, 78 35, 77 52 C76 69, 64 81, 46 79" 
+                  stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="32 38" opacity="0.7"/>
+            <path d="M50 85 C68 84, 84 70, 83 48 C82 28, 68 15, 48 16 C28 17, 15 30, 16 50 C17 70, 30 86, 50 85"
+                  stroke="#000000" stroke-width="1.0" stroke-linecap="round" stroke-dasharray="40 60" opacity="0.6"/>
+            <path d="M45 74 C34 72, 25 61, 26 48 C27 34, 38 25, 52 26 C64 27, 73 37, 72 50 C71 63, 59 75, 45 74"
+                  stroke="#000000" stroke-width="1.3" stroke-linecap="round" stroke-dasharray="24 46" opacity="0.65"/>
+          </g>
+
+          <!-- Group 3: Fast micro-filaments (fine hair-like plasma threads) -->
+          <g class="vortex-layer cw-fast">
+            <path d="M48 14 C64 12, 84 26, 85 48 C86 68, 70 86, 50 85 C30 84, 16 68, 15 48 C14 28, 30 16, 48 14"
+                  stroke="#000000" stroke-width="1.0" stroke-linecap="round" stroke-dasharray="26 64" opacity="0.6"/>
+            <path d="M52 26 C64 28, 74 37, 73 50 C72 62, 62 73, 48 72 C36 71, 28 61, 29 48 C30 36, 40 25, 52 26"
+                  stroke="#000000" stroke-width="0.9" stroke-linecap="round" stroke-dasharray="22 38" opacity="0.5"/>
+            <path d="M46 18 C60 16, 78 28, 80 46 C82 64, 68 80, 52 81 C34 82, 22 68, 20 50 C18 32, 32 20, 46 18"
+                  stroke="#000000" stroke-width="0.8" stroke-linecap="round" stroke-dasharray="35 55" opacity="0.45"/>
+          </g>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <span class="title">Evidex</span>
+      </div>
+    </div>
+    <div class="nav-right">
+      <div class="network-badge"><span class="dot" id="netDot"></span><span id="netLabel">Sepolia</span></div>
+      <button class="btn-primary" id="connectBtn">Connect Wallet</button>
+      <button class="btn-secondary" id="logoutBtn" title="Log out (disconnect wallet)" style="display:none; padding:8px 10px;" onclick="logoutAccount()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<div class="setup-bar" id="setupBar" style="display:none;">
+  <div class="setup-inner">
+    <span class="setup-label">⚠ Admin Only — Contract Address</span>
+    <input id="contractAddressInput" placeholder="Paste your deployed contract address here, e.g. 0xAbC123..." />
+    <button class="btn-secondary" onclick="loadContractAddress()">Load &amp; Save as Default</button>
+    <span class="setup-status" id="contractStatus">Not loaded — paste your deployment address above</span>
+  </div>
+</div>
+
+<!-- ═══════════════ LANDING PAGE ═══════════════ -->
+<div id="landingPage">
+  <div class="v2-hero">
+    <div class="v2-eyebrow fade-up d1">Evidex &middot; Zero-Trust Forensic Ledger</div>
+    <h1 class="fade-up d2">Digital evidence protection like a professional lab would.</h1>
+    <p class="fade-up d3">Cryptographically seal, track, and verify digital forensics from collection to the courtroom on an immutable ledger.</p>
+    <div class="hero-cta-strip fade-up d4">
+      <button class="hero-capsule-btn" onclick="connectWallet()">
+        <span>Connect Wallet &amp; Launch</span>
+        <div class="btn-arrow-circle"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M7 17L17 7M17 7H7M17 7V17"/></svg></div>
+      </button>
+    </div>
+  </div>
+
+
+
+  <div class="v2-bento fade-up d5">
+    <div class="b-card wide">
+      <div class="b-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div>
+      <h3>Immutable Blockchain Ledger</h3>
+      <p>Every custody transfer, lab report, and evidence registration is recorded permanently on Ethereum. The timeline cannot be quietly altered, deleted, or manipulated by anyone — not even the system administrators.</p>
+    </div>
+    
+    <div class="b-card narrow">
+      <div class="b-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+      <h3>Zero-Knowledge</h3>
+      <p>Files are never uploaded to our servers. We generate a cryptographic SHA-256 fingerprint locally on your device.</p>
+    </div>
+    
+    <div class="b-card narrow">
+      <div class="b-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><circle cx="12" cy="11" r="3"/></svg></div>
+      <h3>Biometric Defense</h3>
+      <p>Enterprise-grade on-device facial recognition ensures strict access control. Cryptographic custody keys are bound exclusively to authorized physical identities.</p>
+    </div>
+    
+    <div class="b-card wide">
+      <div class="b-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+      <h3>End-to-End Encryption</h3>
+      <p>Original files are encrypted client-side using military-grade AES-256-GCM before ever touching the IPFS network, meaning only designated custody holders can retrieve and decrypt the raw evidence data.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ MAIN APP CONTENT ═══════════════ -->
+<main id="appContent" style="display: none; opacity: 0; transition: opacity 0.5s ease;">
+<div class="glass-window">
+
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-inner">
+      <div class="eyebrow fade-up d1">Digital Forensics &middot; Immutable Ledger</div>
+      <h1 class="fade-up d2">A chain of custody that <em>cannot</em> be quietly rewritten.</h1>
+      <p class="lede fade-up d3">Every piece of digital evidence is fingerprinted, sealed, and tracked hand-to-hand from collection to court &mdash; permanently recorded on-chain, verifiable by anyone, alterable by no one.</p>
+
+      <div class="role-strip fade-up d4">
+        Connected as
+        <span class="pill" id="roleBadge">&mdash;</span>
+      </div>
+
+      <div class="stat-row fade-up d4">
+        <div class="stat"><div class="num" id="statEvidence">0</div><div class="label">Evidence Filed</div></div>
+        <div class="stat"><div class="num" id="statTransfers">0</div><div class="label">Custody Transfers</div></div>
+        <div class="stat"><div class="num" id="statVerified">0</div><div class="label">Integrity Checks Passed</div></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section class="stage-section">
+  <div class="wrap">
+    <div class="stage-nav">
+      <button class="stage-tab active" data-panel="p-register"><span class="n">01</span><svg class="tab-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="M9 15h6"/></svg> Register Evidence</button>
+      <button class="stage-tab" data-panel="p-transfer"><span class="n">02</span><svg class="tab-icon" viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg> Transfer Custody</button>
+      <button class="stage-tab" data-panel="p-verify"><span class="n">03</span><svg class="tab-icon" viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V5l-8-3z"/><path d="M9 12l2 2 4-4"/></svg> Verify Integrity</button>
+      <button class="stage-tab" data-panel="p-trail"><span class="n">04</span><svg class="tab-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Custody Trail</button>
+      <button class="stage-tab" data-panel="p-access"><span class="n">05</span><svg class="tab-icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Access Control</button>
+    </div>
+
+    <!-- STAGE 1: REGISTER -->
+    <div class="panel active" id="p-register">
+      <div class="panel-grid">
+        <div class="card">
+          <h2>Register New Evidence</h2>
+          <div class="desc">Authorized investigators only. The file itself is never uploaded — only its cryptographic fingerprint is recorded on-chain.</div>
+
+          <label>Case Number</label>
+          <input id="regCaseNumber" placeholder="CASE-2026-014" />
+          <div class="desc" style="margin:8px 0 10px; font-size:11.5px;">Each file is filed under this case; internally each gets <code>-EV01</code>, <code>-EV02</code>, etc., in the order selected below.</div>
+          <label>FIR Number</label>
+          <input id="regFirNumber" placeholder="FIR No. 118/2026" />
+          <label>Police Station</label>
+          <input id="regPoliceStation" placeholder="Madurai City — B4 Anna Nagar PS" />
+          <label>Sections of Law Invoked</label>
+          <input id="regLawSections" placeholder="BNS Sections 316(2), 336" />
+          <label>Description</label>
+          <input id="regDescription" placeholder="Seized hard drive, Exhibit A (applied to every file below)" />
+          <label>Evidence Files <span style="color:var(--color-ash-copy); font-weight:400;">(select one or more — all filed under this case in a single transaction)</span></label>
+          <div class="modern-file-dropzone" id="regFilesDropzone">
+            <input id="regFiles" type="file" multiple class="modern-file-native" onchange="handleModernFileChange(this, 'regFilesPreview', 'regFilesDropzoneContent')" />
+            <div class="dropzone-content" id="regFilesDropzoneContent">
+              <div class="dropzone-icon-badge">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <line x1="12" y1="18" x2="12" y2="12"/>
+                  <line x1="9" y1="15" x2="15" y2="15"/>
+                </svg>
+              </div>
+              <div class="dropzone-info">
+                <div class="dropzone-title">
+                  <span class="dropzone-btn-pill">Choose files</span>
+                  <span class="dropzone-drag-text">or drag and drop multiple items</span>
+                </div>
+                <div class="dropzone-sub">Images, videos, hard drive dumps, logs, or documents (batch register)</div>
+              </div>
+            </div>
+            <div class="dropzone-preview" id="regFilesPreview" style="display:none;"></div>
+          </div>
+          <div id="regFileList" style="display:none;"></div>
+          <label>Case Encryption Key</label>
+          <div style="display:flex; gap:8px;">
+            <input id="regCaseKey" placeholder="Click Generate, or paste an existing case key" style="flex:1;" />
+            <button type="button" class="btn-secondary" style="white-space:nowrap;" onclick="generateAndFillCaseKey()">Generate New</button>
+          </div>
+          <div class="desc" style="margin:6px 0 10px; font-size:11.5px;">One key encrypts every file in this case. Any wallet holding a role you've granted can now retrieve this key automatically from the Case Evidence List — it no longer needs to be shared by hand. Be aware this also means the key is stored in this contract's public on-chain data, so it isn't secret from anyone who reads chain data directly (not just role holders); the blockchain still governs who is allowed to be a custody holder in the first place.</div>
+          <button class="btn-primary btn-block" onclick="registerEvidence(this)">File Evidence On-Chain</button>
+          <div id="regResult"></div>
+          <div id="regUploadResult"></div>
+        </div>
+        <div class="card">
+          <h2>What gets recorded</h2>
+          <div class="desc">A permanent, timestamped entry containing:</div>
+          <div style="margin-top:18px;">
+            <div style="padding-bottom:14px; border-bottom:1px solid var(--navy-700); margin-bottom:14px;">
+              <div style="color:var(--ink-100); font-size:13px; font-weight:600;">FIR, Case &amp; Legal Context</div>
+              <div style="font-family:var(--mono); font-size:11.5px; color:var(--ink-500); margin-top:4px;">FIR number, police station, and sections of law — so this evidence is traceable to the exact legal case it belongs to.</div>
+            </div>
+            <div style="padding-bottom:14px; border-bottom:1px solid var(--navy-700); margin-bottom:14px;">
+              <div style="color:var(--ink-100); font-size:13px; font-weight:600;">SHA-256 File Hash</div>
+              <div style="font-family:var(--mono); font-size:11.5px; color:var(--ink-500); margin-top:4px;">Computed locally in your browser — the file itself never leaves your device.</div>
+            </div>
+            <div style="padding-bottom:14px; border-bottom:1px solid var(--navy-700); margin-bottom:14px;">
+              <div style="color:var(--ink-100); font-size:13px; font-weight:600;">Encrypted File on IPFS</div>
+              <div style="font-family:var(--mono); font-size:11.5px; color:var(--ink-500); margin-top:4px;">The file is encrypted in your browser with a key derived from this case's Case Encryption Key, then uploaded to IPFS via Pinata. Any officer who holds a role granted by the admin, and who has been securely given the Case Encryption Key, can decrypt it later — not just the registering wallet.</div>
+            </div>
+            <div style="padding-bottom:14px; border-bottom:1px solid var(--navy-700); margin-bottom:14px;">
+              <div style="color:var(--ink-100); font-size:13px; font-weight:600;">Registering Officer &amp; Timestamp</div>
+              <div style="font-family:var(--mono); font-size:11.5px; color:var(--ink-500); margin-top:4px;">Bound to the wallet address that submitted the transaction.</div>
+            </div>
+            <div>
+              <div style="color:var(--ink-100); font-size:13px; font-weight:600;">Immutability Guarantee</div>
+              <div style="font-family:var(--mono); font-size:11.5px; color:var(--ink-500); margin-top:4px;">No account, including the contract admin, can edit or delete this record.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STAGE 2: TRANSFER -->
+    <div class="panel" id="p-transfer">
+      <div class="panel-grid" style="grid-template-columns: 1fr;">
+        <div class="card">
+          <h2>Current Holder Lookup</h2>
+          <div class="desc">Check who currently holds every evidence item filed under a case, before initiating a transfer.</div>
+          <label>Case Number</label>
+          <input id="holderLookupCaseNumber" placeholder="CASE-2026-014" />
+          <button class="btn-secondary btn-block" onclick="lookupHolder(this)">Check Current Holders</button>
+          <div id="holderResult"></div>
+        </div>
+      </div>
+
+      <div class="panel-grid" style="margin-top:22px; grid-template-columns: 1fr;">
+        <div class="card">
+          <h2>Transfer Custody</h2>
+          <div class="desc">Find every evidence item filed under a case, then hand all of them to the same new holder in a single transaction. You must currently hold custody of every item selected.</div>
+          <label>Case Number</label>
+          <input id="bulkTransferCaseNumber" placeholder="CASE-2026-014" />
+          <button class="btn-secondary btn-block" onclick="findCaseEvidenceForTransfer(this)">Find Evidence</button>
+          <div id="bulkTransferList" style="margin-top:14px;"></div>
+          <label style="margin-top:10px;">New Holder Address</label>
+          <input id="bulkTransferNewHolder" placeholder="0x..." />
+          <label>Note</label>
+          <input id="bulkTransferNote" placeholder="Received by Forensic Lab for imaging" />
+          <button class="btn-primary btn-block" id="bulkTransferBtn" style="display:none;" onclick="bulkTransferCustody(this)">Transfer Selected to New Holder</button>
+          <div id="bulkTransferResult"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STAGE 3: VERIFY -->
+    <div class="panel" id="p-verify">
+      <div class="panel-grid">
+        <div class="card">
+          <h2>Verify Integrity</h2>
+          <div class="desc">Find every evidence item filed under a case, re-upload each file, and check all of them against the immutable on-chain record in a single transaction.</div>
+          <label>Case Number</label>
+          <input id="bulkVerifyCaseNumber" placeholder="CASE-2026-014" />
+          <button class="btn-secondary btn-block" onclick="findCaseEvidenceForVerify(this)">Find Evidence</button>
+          <div id="bulkVerifyList" style="margin-top:14px;"></div>
+          <button class="btn-primary btn-block" id="bulkVerifyBtn" style="display:none; margin-top:10px;" onclick="bulkVerifyIntegrity(this)">Verify All</button>
+          <div id="bulkVerifyResult"></div>
+        </div>
+        <div class="card seal-stage" id="sealCard" style="display:none;">
+          <div class="seal-holder">
+            <div class="seal-ring"></div>
+            <div class="seal" id="sealEl">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.4"><path d="M12 2 4 5v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V5l-8-3z"/><path d="M9 12l2 2 4-4"/></svg>
+            </div>
+          </div>
+          <div class="seal-verdict" id="sealVerdict"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STAGE 4: TRAIL -->
+    <div class="panel" id="p-trail">
+      <div class="panel-grid">
+        <div class="card">
+          <h2>Custody Trail</h2>
+          <div class="desc">Find every evidence item filed under a case and see the full, tamper-proof handoff history for the case as a whole — from field collection to courtroom.</div>
+          <label>Case Number</label>
+          <input id="trailCaseNumber" placeholder="CASE-2026-014" />
+          <button class="btn-secondary btn-block" onclick="findCaseEvidenceForTrail(this)">Find Evidence</button>
+          <div id="trailCaseList" style="margin-top:14px;"></div>
+          <div id="caseDetails" style="margin-top:18px;"></div>
+          <button class="btn-secondary btn-block" id="closeCaseBtn" style="display:none;" onclick="closeCaseAction(this)">Close Case (Court Only)</button>
+          <div id="closeCaseResult"></div>
+        </div>
+        <div class="card">
+          <h2>Docket</h2>
+          <div id="trailResult" class="timeline"><div style="color:var(--ink-500); font-size:13px;">No record loaded yet.</div></div>
+        </div>
+      </div>
+
+      <div class="panel-grid" style="margin-top:22px; grid-template-columns: 1fr;">
+        <div class="card">
+          <h2>Custody Anomaly Flags</h2>
+          <div class="desc">Transparent, rule-based checks run locally against the on-chain custody trail and integrity-check history — no black-box model, every flag below states exactly which rule triggered it.</div>
+          <div id="anomalyResult" style="margin-top:12px;"><div style="color:var(--ink-500); font-size:13px;">Load a custody trail above to run checks.</div></div>
+        </div>
+      </div>
+
+      <div class="panel-grid" style="margin-top:22px; grid-template-columns: 1fr;">
+        <div class="card">
+          <h2>Lab Analysis Report</h2>
+          <div class="desc">Lab officers only. Investigator has evidence registration and Court has case closure — this is Lab's equivalent: a permanent, on-chain record of forensic findings against a specific evidence item. Multiple reports can accumulate on the same item (e.g. separate tests); nothing is ever overwritten.</div>
+          <label>Case Number</label>
+          <input id="labReportCaseNumber" placeholder="CASE-2026-014" />
+          <button class="btn-secondary btn-block" onclick="loadLabCaseEvidence()">Load Evidence for This Case</button>
+          <label style="margin-top:14px;">Evidence Item</label>
+          <select id="labReportEvidenceSelect" disabled>
+            <option value="">Load a case above first</option>
+          </select>
+          <label>Findings</label>
+          <input id="labReportFindings" placeholder="Disk image verified, no signs of tampering; recovered 3 deleted files under /Users/..." />
+          <label>Supporting File (optional)</label>
+          <div class="modern-file-dropzone" id="labReportDropzone">
+            <input id="labReportFile" type="file" class="modern-file-native" onchange="handleModernFileChange(this, 'labReportPreview', 'labReportDropzoneContent')" />
+            <div class="dropzone-content" id="labReportDropzoneContent">
+              <div class="dropzone-icon-badge">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+              </div>
+              <div class="dropzone-info">
+                <div class="dropzone-title">
+                  <span class="dropzone-btn-pill">Choose file</span>
+                  <span class="dropzone-drag-text">or drag and drop</span>
+                </div>
+                <div class="dropzone-sub">PDF, disk image, forensic findings, or document</div>
+              </div>
+            </div>
+            <div class="dropzone-preview" id="labReportPreview" style="display:none;"></div>
+          </div>
+          <label>Case Encryption Key</label>
+          <input id="labReportCaseKey" placeholder="Auto-filled if cached in this browser, or ask the registering officer" />
+          <div class="desc" style="margin-top:2px;">Only needed if you're attaching a file — it's encrypted the same way evidence files are, so any custody holder with this key can open it later.</div>
+          <button class="btn-primary btn-block" onclick="submitLabReportAction(this)">Submit Lab Report (Lab Only)</button>
+          <div id="labReportUploadResult"></div>
+          <div id="labReportSubmitResult"></div>
+
+          <label style="margin-top:22px;">View Reports for the Selected Evidence Item</label>
+          <button class="btn-secondary btn-block" onclick="viewLabReports()">Load Lab Reports</button>
+          <div id="labReportsList" style="margin-top:12px;"></div>
+        </div>
+      </div>
+
+      <div class="panel-grid" style="margin-top:22px; grid-template-columns: 1fr;">
+        <div class="card">
+          <h2>Case Evidence List</h2>
+          <div class="desc">Lists every evidence item filed under a case number, with a Download button per item, plus a "Download All as ZIP" option. Works for any wallet holding a role granted by the admin — the Case Encryption Key is fetched automatically below once you search.</div>
+          <label>Case Number</label>
+          <input id="caseBundleCaseNumber" placeholder="CASE-2026-014" />
+          <label>Case Encryption Key</label>
+          <input id="caseBundleKey" placeholder="Auto-filled after Find Evidence, if you hold a role" />
+          <button class="btn-secondary btn-block" onclick="findCaseEvidence(this)">Find Evidence</button>
+          <div id="caseBundleList" style="margin-top:14px;"></div>
+          <button class="btn-primary btn-block" id="caseBundleDownloadBtn" style="display:none;" onclick="downloadCaseBundle(this)">Download All as ZIP</button>
+          <button class="btn-secondary btn-block" id="courtReportBtn" style="display:none;" onclick="generateCourtReport(this)">📄 Generate Court-Ready Report (PDF)</button>
+          <div class="desc" id="courtReportHint" style="display:none; margin-top:2px;">Section 63 (BSA, 2023) electronic-evidence certificate, full custody trail, and integrity verification — formatted for direct submission to court.</div>
+          <div id="caseBundleResult"></div>
+          <div id="courtReportResult"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STAGE 5: ACCESS CONTROL -->
+    <div class="panel" id="p-access">
+
+      <!-- Available to every connected wallet -->
+      <div class="masonry-grid">
+        <div class="card">
+          <h2>Check Role</h2>
+          <div class="desc">Look up the authorization level of any wallet address.</div>
+          <label>Address</label>
+          <input id="checkAddress" placeholder="0x..." />
+          <button class="btn-secondary btn-block" onclick="checkRoleAction()">Check Role</button>
+          <div id="checkRoleResult"></div>
+        </div>
+        <div class="card">
+          <h2>My Officer Identity</h2>
+          <div class="desc">Binds your name, designation, and badge ID to this wallet on-chain, so custody trails and court reports show your identity instead of a raw address.</div>
+          <label>Full Name</label>
+          <input id="myOfficerName" placeholder="R. Khan" />
+          <label>Designation</label>
+          <input id="myOfficerDesignation" placeholder="Inspector, Cyber Crime Wing" />
+          <label>Badge / Service ID</label>
+          <input id="myOfficerBadge" placeholder="TN-4471" />
+          <button class="btn-primary btn-block" onclick="saveMyOfficerProfile(this)">Save My Identity</button>
+          <button class="btn-secondary btn-block" style="margin-top:8px;" onclick="removeMyOfficerProfile(this)">Remove My Identity</button>
+          <div id="myOfficerResult"></div>
+        </div>
+        <div class="card">
+          <h2>Face Verification</h2>
+          <div class="desc">Optional extra layer, entirely client-side — nothing leaves your browser. Enroll your face plus a PIN once; the site will then ask for both before Pause, Unpause, or Admin Transfer actions. The PIN exists because face matching alone can't reliably tell apart people who look very similar (e.g. twins/siblings) — that's a known limit of face recognition generally, not just this build. This is a UX safeguard against someone else using an unlocked wallet, not a cryptographic control — it can't be enforced by the smart contract itself, and enrollment is per-browser, not portable across devices.</div>
+          <div class="setup-status" id="faceEnrollStatus" style="margin:10px 0 14px; font-size:12.5px;">Checking enrollment status...</div>
+          <label>Security PIN (4–6 digits)</label>
+          <input id="facePinEnroll" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="e.g. 4471" />
+          <button class="btn-primary btn-block" onclick="startFaceEnrollment()">Enroll / Re-enroll My Face</button>
+          <button class="btn-secondary btn-block" style="margin-top:8px;" onclick="clearFaceEnrollment()">Remove My Enrollment</button>
+          <div id="faceEnrollResult"></div>
+        </div>
+      </div>
+
+      <!-- Admin-only actions, grouped together at the bottom -->
+      <div class="section-divider" id="adminOnlyDivider" style="display:none;">
+        <span class="eyebrow">Admin Only</span>
+        <span class="sub">Visible only to the connected admin wallet</span>
+      </div>
+      <div class="masonry-grid" id="adminOnlyGrid" style="display:none;">
+        <div class="card">
+          <h2>Grant / Revoke Role</h2>
+          <div class="desc">Authorizes an address as Investigator, Lab, Court, or any custom role created below — before it can take custody of evidence.</div>
+          <label>Address</label>
+          <input id="roleAddress" placeholder="0x..." />
+          <label>Role</label>
+          <select id="roleSelect">
+            <option value="1">Investigator</option>
+            <option value="2">Lab</option>
+            <option value="3">Court</option>
+          </select>
+          <button class="btn-primary btn-block" onclick="grantRoleAction()">Grant Role</button>
+          <button class="btn-secondary btn-block" onclick="revokeRoleAction()">Revoke Role</button>
+          <div id="roleResult"></div>
+        </div>
+        <div class="card">
+          <h2>Create New Role</h2>
+          <div class="desc">Adds a new custody-eligible role with any name you choose — e.g. "Forensic Examiner" or "External Auditor" — without redeploying the contract. New roles can receive and hold evidence and appear by name everywhere, but do not get Investigator's register-evidence or Court's close-case authority; grant one of the three built-in roles for that.</div>
+          <label>Role Name</label>
+          <input id="newRoleName" placeholder="Forensic Examiner" />
+          <button class="btn-primary btn-block" onclick="createCustomRoleAction(this)">Create Role</button>
+          <div id="createRoleResult"></div>
+          <div id="customRoleList" style="margin-top:14px; font-family:var(--mono); font-size:11px; color:var(--ink-500);"></div>
+
+          <label style="margin-top:22px;">Remove a Custom Role</label>
+          <div class="desc" style="margin-bottom:10px;">Only possible once nobody holds the role — revoke it from every wallet in "Grant / Revoke Role" first. Built-in roles (Investigator, Lab, Court) can't be removed.</div>
+          <select id="removeRoleSelect">
+            <option value="">No custom roles yet</option>
+          </select>
+          <button class="btn-secondary btn-block" onclick="removeCustomRoleAction(this)">Remove Role</button>
+          <div id="removeRoleResult"></div>
+        </div>
+        <div class="card">
+          <h2>Set Officer Identity (Admin Override)</h2>
+          <div class="desc">Pre-provision or correct another wallet's on-chain identity — useful when onboarding an officer before they set their own.</div>
+          <label>Wallet Address</label>
+          <input id="adminOfficerAddress" placeholder="0x..." />
+          <label>Full Name</label>
+          <input id="adminOfficerName" placeholder="R. Khan" />
+          <label>Designation</label>
+          <input id="adminOfficerDesignation" placeholder="Inspector, Cyber Crime Wing" />
+          <label>Badge / Service ID</label>
+          <input id="adminOfficerBadge" placeholder="TN-4471" />
+          <button class="btn-primary btn-block" onclick="saveAdminOfficerProfile(this)">Save Identity</button>
+          <div id="adminOfficerResult"></div>
+        </div>
+        <div class="card">
+          <h2>Emergency Pause</h2>
+          <div class="desc">Halts evidence registration, custody transfer, verification, and case closure instantly if a problem is found. Role management stays available so you can still respond.</div>
+          <div class="setup-status" id="pauseStatus" style="margin:10px 0 14px; font-size:12.5px;">Checking status...</div>
+          <button class="btn-primary btn-block" id="pauseBtn" onclick="pauseContract()">Pause Contract</button>
+          <button class="btn-secondary btn-block" id="unpauseBtn" onclick="unpauseContract()" style="display:none;">Unpause Contract</button>
+          <div id="pauseResult"></div>
+        </div>
+        <div class="card">
+          <h2>Admin Transfer</h2>
+          <div class="desc">Two-step handover: nominate a successor here, then that address must call Accept from their own wallet. Nothing changes until they accept, so a mistyped address can never lock you out.</div>
+          <label>New Admin Address</label>
+          <input id="proposeAdminAddress" placeholder="0x..." />
+          <button class="btn-primary btn-block" onclick="proposeAdminAction()">Propose New Admin</button>
+          <div id="pendingAdminStatus" style="margin-top:10px; font-family:var(--mono); font-size:11.5px; color:var(--ink-500);"></div>
+          <button class="btn-secondary btn-block" id="acceptAdminBtn" onclick="acceptAdminAction()" style="display:none;">Accept Admin Role (connected wallet)</button>
+          <button class="btn-secondary btn-block" id="cancelAdminBtn" onclick="cancelAdminTransferAction()" style="display:none;">Cancel Pending Transfer</button>
+          <div id="adminTransferResult"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+</div> <!-- /glass-window -->
+</main> <!-- /appContent -->
+
+<footer>
+  <div class="wrap foot-grid">
+
+  </div>
+</footer>
+
+<!-- Face Verification Modal (enroll + verify) -->
+<div id="faceModalOverlay" style="display:none; position:fixed; inset:0; background:rgba(6,10,20,0.88); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); z-index:10000; align-items:center; justify-content:center;">
+  <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.15); border-radius:24px; padding:28px; width:min(440px, 92vw); box-shadow:0 30px 80px rgba(0,0,0,0.8), inset 0 0 20px rgba(255,255,255,0.05); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);">
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+      <div style="width:8px; height:8px; border-radius:50%; background:var(--cyan); animation:dotPulse 2s ease-in-out infinite; box-shadow:0 0 10px rgba(34,211,238,0.4);"></div>
+      <h2 id="faceModalTitle" style="margin:0; font-size:17px; color:var(--ink-100);">Face Verification</h2>
+    </div>
+    <div id="faceModalDesc" style="font-size:12.5px; color:var(--ink-500); margin-bottom:16px;">Position your face in the frame.</div>
+
+    <div style="position:relative; width:100%; aspect-ratio:4/3; background:#030810; border-radius:12px; overflow:hidden; border:1px solid rgba(34,211,238,0.1); box-shadow:inset 0 0 40px rgba(0,0,0,0.5), 0 0 30px rgba(34,211,238,0.03);">
+      <video id="faceVideo" autoplay muted playsinline style="width:100%; height:100%; object-fit:cover; transform:scaleX(-1);"></video>
+      <canvas id="faceOverlay" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transform:scaleX(-1);"></canvas>
+      <div id="faceTrackingHUD" style="position:absolute; top:10px; left:12px; font-family:var(--mono); font-size:9.5px; color:rgba(34,211,238,0.7); pointer-events:none; line-height:1.5;"></div>
+      <div id="faceConfidenceBar" style="position:absolute; bottom:0; left:0; right:0; height:3px; background:rgba(34,211,238,0.08);"><div id="faceConfidenceFill" style="width:0%; height:100%; background:linear-gradient(90deg, var(--cyan), var(--green)); border-radius:2px; transition:width 0.2s ease;"></div></div>
+    </div>
+
+    <div id="faceModalStatus" style="margin-top:14px; font-size:12.5px; color:var(--ink-300); min-height:18px;">Starting camera...</div>
+    <div id="faceModalResult" style="margin-top:6px;"></div>
+
+    <div id="facePinStep" style="display:none; margin-top:14px;">
+      <label style="font-size:11px; color:var(--ink-500); text-transform:uppercase; letter-spacing:0.5px;">Enter Your Security PIN</label>
+      <input id="facePinVerify" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="PIN" style="margin-top:6px;" onkeypress="if(event.key==='Enter') submitFacePinVerify()" />
+      <button class="btn-primary btn-block" style="margin-top:10px;" onclick="submitFacePinVerify()">Confirm</button>
+    </div>
+
+    <div style="display:flex; gap:10px; margin-top:16px;">
+      <button class="btn-secondary btn-block" onclick="closeFaceModal()">Cancel</button>
+      <button class="btn-primary btn-block" id="faceRetryBtn" style="display:none;" onclick="retryFaceCapture()">Try Again</button>
+    </div>
+  </div>
+</div>
+
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/particles.js"></script>
+</body>
+</html>
