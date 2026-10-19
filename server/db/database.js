@@ -27,6 +27,30 @@ function initDatabase() {
     db.exec(schemaSql);
   }
 
+  // Safe migrations for preexisting tables
+  try {
+    const tableInfo = db.prepare("PRAGMA table_info(officer_profiles)").all();
+    const existingCols = new Set(tableInfo.map(c => c.name));
+    const newCols = [
+      { name: 'gender', type: 'TEXT' },
+      { name: 'dob', type: 'TEXT' },
+      { name: 'age', type: 'INTEGER' },
+      { name: 'mobile', type: 'TEXT' },
+      { name: 'email', type: 'TEXT' },
+      { name: 'role', type: 'TEXT' },
+      { name: 'department_data', type: 'TEXT' },
+      { name: 'face_photo', type: 'TEXT' },
+      { name: 'aadhaar_status', type: "TEXT DEFAULT 'VERIFIED_UIDAI'" }
+    ];
+    for (const col of newCols) {
+      if (!existingCols.has(col.name)) {
+        db.exec(`ALTER TABLE officer_profiles ADD COLUMN ${col.name} ${col.type};`);
+      }
+    }
+  } catch (migErr) {
+    console.warn('[Database] Migration notice:', migErr.message);
+  }
+
   console.log(`[Database] SQLite initialized successfully at: ${config.dbPath}`);
   return db;
 }

@@ -107,6 +107,83 @@
       } catch (err) {
         // Non-blocking
       }
+    },
+
+    // Verify Aadhaar PDF authenticity & cross-check with form details
+    async verifyAadhaar(pdfBase64, officerName, dob, gender) {
+      try {
+        const res = await fetch(`${API_BASE}/auth/verify-aadhaar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pdfBase64, officerName, dob, gender })
+        });
+        return await res.json();
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+    },
+
+    // Submit new officer access request
+    async submitRegistrationRequest(payload) {
+      try {
+        const res = await fetch(`${API_BASE}/auth/register-request`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        return await res.json();
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+    },
+
+    // Check authorization status of a wallet address
+    async getAuthStatus(walletAddress) {
+      if (!walletAddress) return null;
+      try {
+        const res = await fetch(`${API_BASE}/auth/status/${encodeURIComponent(walletAddress)}`);
+        return await res.json();
+      } catch (err) {
+        return null;
+      }
+    },
+
+    // Fetch pending and reviewed officer registration requests (Admin)
+    async getAdminRequests() {
+      try {
+        const res = await fetch(`${API_BASE}/auth/admin/requests`);
+        return await res.json();
+      } catch (err) {
+        return { success: false, requests: [], total: 0, pendingCount: 0 };
+      }
+    },
+
+    // Approve or reject an officer application (Admin)
+    async submitAdminDecision(requestId, decision, reason = '') {
+      try {
+        const res = await fetch(`${API_BASE}/auth/admin/decision`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requestId, decision, reason })
+        });
+        return await res.json();
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+    },
+
+    // Officer self-updates contact or departmental profile
+    async updateOfficerProfile(payload) {
+      try {
+        const res = await fetch(`${API_BASE}/auth/profile/update`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        return await res.json();
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
     }
   };
 

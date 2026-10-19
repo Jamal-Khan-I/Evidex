@@ -72,7 +72,14 @@
     </div>
     <div class="nav-right">
       <div class="network-badge"><span class="dot" id="netDot"></span><span id="netLabel">Sepolia</span></div>
-      <button class="btn-primary" id="connectBtn">Connect Wallet</button>
+      <button class="btn-register-account" id="createAccountBtn" onclick="openRegisterModal()" title="Apply for Evidex Officer Access">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+        <span>Create Evidex Account</span>
+      </button>
+      <button class="btn-profile-icon" id="profileIconBtn" title="Officer Identity & Profile" style="display:none;" onclick="openOfficerProfileModal()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </button>
+      <button class="btn-primary" id="connectBtn" onclick="connectWallet()">Connect Wallet</button>
       <button class="btn-secondary" id="logoutBtn" title="Log out (disconnect wallet)" style="display:none; padding:8px 10px;" onclick="logoutAccount()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
       </button>
@@ -506,6 +513,19 @@
           <button class="btn-secondary btn-block" id="cancelAdminBtn" onclick="cancelAdminTransferAction()" style="display:none;">Cancel Pending Transfer</button>
           <div id="adminTransferResult"></div>
         </div>
+
+        <div class="card" style="border: 1.5px solid #3b82f6; box-shadow: 0 4px 20px rgba(59, 130, 246, 0.08);">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h2>Officer Access Requests (KYC)</h2>
+            <span class="badge-status-pending" id="adminPendingBadge">0 Pending</span>
+          </div>
+          <div class="desc">Review submitted officer applications, live captured face photos, and cryptographically verified e-Aadhaar credentials before granting blockchain authorization.</div>
+          <div style="margin: 16px 0; font-size: 13px; color: var(--ink-500);" id="adminRequestsSummary">Loading applications...</div>
+          <button class="btn-primary btn-block" onclick="openAdminRequestsModal()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px; vertical-align: middle;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Review Officer Applications
+          </button>
+        </div>
       </div>
     </div>
 
@@ -549,6 +569,337 @@
     <div style="display:flex; gap:10px; margin-top:16px;">
       <button class="btn-secondary btn-block" onclick="closeFaceModal()">Cancel</button>
       <button class="btn-primary btn-block" id="faceRetryBtn" style="display:none;" onclick="retryFaceCapture()">Try Again</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ MODAL 1: OFFICER REGISTRATION & ONBOARDING ═══════════════ -->
+<div class="evidex-modal-backdrop" id="registerModalBackdrop">
+  <div class="evidex-modal-container">
+    <div class="modal-header">
+      <div class="modal-title-wrap">
+        <h3>Evidex Officer Identity Registration</h3>
+        <p>Tamil Nadu Police Forensic Ledger &middot; Biometric &amp; Cryptographic Credential Onboarding</p>
+      </div>
+      <button class="modal-close-btn" onclick="closeRegisterModal()" title="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="reg-split-grid">
+        
+        <!-- LEFT: Live Webcam Face Capture -->
+        <div class="webcam-panel">
+          <div style="font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 4px;">Live Face Capture</div>
+          <div style="font-size: 11.5px; color: #64748b; margin-bottom: 12px; text-align: center;">Official Passport Frame (3:4 ratio)</div>
+          
+          <div class="webcam-viewport" id="regWebcamViewport">
+            <video id="regWebcam" autoplay playsinline muted></video>
+            <canvas id="regCanvas"></canvas>
+            <img id="regPhotoPreview" class="webcam-preview-img" alt="Captured Passport Photo" />
+            <div class="passport-guide-oval" id="regGuideOval"></div>
+            <div class="live-indicator-badge" id="regLiveBadge">
+              <span class="dot"></span>
+              <span>LIVE</span>
+            </div>
+          </div>
+
+          <div class="webcam-controls">
+            <button type="button" class="btn-primary btn-block" id="regCaptureBtn" onclick="capturePassportPhoto()" style="padding: 10px 14px; font-size: 13px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px; vertical-align:middle;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              Capture Passport Photo
+            </button>
+            <button type="button" class="btn-secondary btn-block" id="regRetakeBtn" onclick="retakePassportPhoto()" style="display:none; padding: 10px 14px; font-size: 13px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px; vertical-align:middle;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+              Retake Photo
+            </button>
+          </div>
+
+          <div class="webcam-hint">
+            Ensure your face is well-lit, looking directly into the camera lens with no glare or obstruction.
+          </div>
+        </div>
+
+        <!-- RIGHT: Form Details & Aadhaar Cross-Verification -->
+        <div class="reg-form-panel">
+          
+          <!-- Personal Information -->
+          <div class="form-row-2">
+            <div class="reg-field-group">
+              <label for="regOfficerName">Full Name (as in Aadhaar)</label>
+              <input id="regOfficerName" placeholder="e.g. R. Senthil Kumar" oninput="validateRegistrationForm()" />
+            </div>
+            <div class="reg-field-group">
+              <label for="regGender">Gender</label>
+              <select id="regGender" onchange="validateRegistrationForm()">
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row-3">
+            <div class="reg-field-group">
+              <label for="regDob">Date of Birth</label>
+              <input id="regDob" type="date" onchange="handleDobChange(this.value)" />
+            </div>
+            <div class="reg-field-group">
+              <label for="regAge">Age <span class="opt">(Auto-calculated)</span></label>
+              <input id="regAge" placeholder="Age" readonly style="background: #f1f5f9; color: #475569;" />
+            </div>
+            <div class="reg-field-group">
+              <label for="regMobile">Mobile Number</label>
+              <input id="regMobile" type="tel" maxlength="10" placeholder="9876543210" oninput="validateRegistrationForm()" />
+            </div>
+          </div>
+
+          <div class="form-row-2">
+            <div class="reg-field-group">
+              <label for="regEmail">Official Email Address</label>
+              <input id="regEmail" type="email" placeholder="officer@tnpolice.gov.in" oninput="validateRegistrationForm()" />
+            </div>
+            <div class="reg-field-group">
+              <label for="regRole">Service Role Designation</label>
+              <select id="regRole" onchange="handleRoleSelectionChange(this.value)">
+                <option value="POLICE">Police Officer / Investigator</option>
+                <option value="FORENSICS">Forensic Laboratory Specialist</option>
+                <option value="COURT">Court Judicial Authority</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- MetaMask Wallet Address (Manual Entry - Not Connected Yet) -->
+          <div class="reg-field-group">
+            <label for="regWalletAddress">
+              MetaMask Wallet Address (0x...) 
+              <span class="opt" style="color: #2563eb; font-weight: 500;">Manual paste required (Do not connect yet)</span>
+            </label>
+            <input id="regWalletAddress" placeholder="Paste your 42-character Ethereum address (e.g. 0xAbC123...)" oninput="validateWalletAddressInput(this.value)" style="font-family: var(--font-mono); font-size: 12.5px;" />
+            <div id="regWalletValidationMsg" style="font-size: 11.5px; margin-top: 2px;"></div>
+          </div>
+
+          <!-- Dynamic Role Fields: Police -->
+          <div class="dynamic-dept-box" id="regPoliceFields">
+            <div class="dynamic-dept-title">Police Department Details</div>
+            <div class="form-row-2">
+              <div class="reg-field-group">
+                <label for="regPoliceStation">Police Station Name &amp; Code</label>
+                <input id="regPoliceStation" placeholder="e.g. Chennai Central — B1 North Beach PS" oninput="validateRegistrationForm()" />
+              </div>
+              <div class="reg-field-group">
+                <label for="regDistrict">District / Commissionerate</label>
+                <input id="regDistrict" placeholder="e.g. Greater Chennai Police" oninput="validateRegistrationForm()" />
+              </div>
+            </div>
+            <div class="form-row-2" style="margin-top: 10px;">
+              <div class="reg-field-group">
+                <label for="regBadgeNumber">Badge / Constabulary Number</label>
+                <input id="regBadgeNumber" placeholder="e.g. TNP-4482" oninput="validateRegistrationForm()" />
+              </div>
+              <div class="reg-field-group">
+                <label for="regRank">Rank / Designation</label>
+                <select id="regRank">
+                  <option value="Inspector of Police">Inspector of Police</option>
+                  <option value="Sub-Inspector (SI)">Sub-Inspector (SI)</option>
+                  <option value="Head Constable">Head Constable</option>
+                  <option value="Deputy Superintendent (DSP)">Deputy Superintendent (DSP)</option>
+                  <option value="Superintendent of Police (SP)">Superintendent of Police (SP)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dynamic Role Fields: Forensics (Hidden by default) -->
+          <div class="dynamic-dept-box" id="regForensicsFields" style="display:none;">
+            <div class="dynamic-dept-title">Forensic Laboratory Credentials</div>
+            <div class="form-row-2">
+              <div class="reg-field-group">
+                <label for="regLabId">Forensic Lab Name &amp; ID</label>
+                <input id="regLabId" placeholder="e.g. Forensic Sciences Dept, Mylapore — FSL-09" oninput="validateRegistrationForm()" />
+              </div>
+              <div class="reg-field-group">
+                <label for="regAccreditationNumber">NABL / State Accreditation No</label>
+                <input id="regAccreditationNumber" placeholder="e.g. NABL-TC-8812" oninput="validateRegistrationForm()" />
+              </div>
+            </div>
+            <div class="reg-field-group" style="margin-top: 10px;">
+              <label for="regSpecialization">Laboratory Division Specialization</label>
+              <select id="regSpecialization">
+                <option value="Cyber Forensics &amp; Digital Evidence">Cyber Forensics &amp; Digital Evidence</option>
+                <option value="DNA &amp; Serology Division">DNA &amp; Serology Division</option>
+                <option value="Ballistics &amp; Firearms Analysis">Ballistics &amp; Firearms Analysis</option>
+                <option value="Toxicology &amp; Chemical Examination">Toxicology &amp; Chemical Examination</option>
+                <option value="Questioned Documents &amp; Fingerprints">Questioned Documents &amp; Fingerprints</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Dynamic Role Fields: Court (Hidden by default) -->
+          <div class="dynamic-dept-box" id="regCourtFields" style="display:none;">
+            <div class="dynamic-dept-title">Judicial Authority Credentials</div>
+            <div class="form-row-2">
+              <div class="reg-field-group">
+                <label for="regCourtName">Court Complex &amp; Jurisdiction</label>
+                <input id="regCourtName" placeholder="e.g. Principal Sessions Court, Chennai" oninput="validateRegistrationForm()" />
+              </div>
+              <div class="reg-field-group">
+                <label for="regCourtDesignation">Designation</label>
+                <select id="regCourtDesignation">
+                  <option value="Judicial Magistrate">Judicial Magistrate</option>
+                  <option value="District &amp; Sessions Judge">District &amp; Sessions Judge</option>
+                  <option value="Public Prosecutor">Public Prosecutor</option>
+                  <option value="Registrar of Evidence">Registrar of Evidence</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Aadhaar PDF Upload & Verification -->
+          <div class="reg-field-group">
+            <label>e-Aadhaar PDF Verification <span class="opt">Cryptographic PKCS#7 authenticity &amp; cross-verification</span></label>
+            <div class="aadhaar-upload-box" id="regAadhaarDropzone" onclick="document.getElementById('regAadhaarFile').click()">
+              <input type="file" id="regAadhaarFile" accept=".pdf" style="display:none;" onchange="handleAadhaarFileUpload(event)" />
+              <div id="aadhaarUploadPrompt">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="1.8" style="margin-bottom:6px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                <div style="font-size: 13px; font-weight: 600; color: #0f172a;">Upload Official e-Aadhaar PDF</div>
+                <div style="font-size: 11.5px; color: #64748b; margin-top: 2px;">Click or drag PDF here. Tamper &amp; digital signatures will be verified automatically.</div>
+              </div>
+              <div id="aadhaarUploadProgress" style="display:none; font-size:12.5px; color:#2563eb; font-weight:600;">
+                Validating cryptographic signatures &amp; analyzing document structure...
+              </div>
+            </div>
+
+            <!-- Verification Checklist Indicators -->
+            <div class="aadhaar-checklist" id="regAadhaarChecklist" style="display:none;">
+              <div class="check-item" id="chkSig">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>UIDAI PKCS#7 Digital Signature: <strong id="lblSig">Checking...</strong></span>
+              </div>
+              <div class="check-item" id="chkTamper">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>Document Anti-Tamper Check: <strong id="lblTamper">Clean Authentic Document</strong></span>
+              </div>
+              <div class="check-item" id="chkName">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>Name Cross-Check: <strong id="lblName">Verified Match</strong></span>
+              </div>
+              <div class="check-item" id="chkDob">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>Date of Birth Cross-Check: <strong id="lblDob">Exact Match</strong></span>
+              </div>
+              <div class="check-item" id="chkGender">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>Gender Cross-Check: <strong id="lblGender">Matched</strong></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Submit Request Button -->
+          <div style="margin-top: 8px;">
+            <button type="button" class="btn-primary btn-block" id="regSubmitBtn" disabled onclick="submitOfficerRegistration()" style="padding: 13px; font-size: 14px; font-weight: 700;">
+              Submit Access Request for Department Review
+            </button>
+            <div id="regStatusNotice" style="margin-top: 8px; font-size: 12.5px; text-align: center;"></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ MODAL 2: OFFICER PROFILE VIEW & UPDATE ═══════════════ -->
+<div class="evidex-modal-backdrop" id="officerProfileModalBackdrop">
+  <div class="evidex-modal-container" style="max-width: 680px;">
+    <div class="modal-header">
+      <div class="modal-title-wrap">
+        <h3>Officer Service Dossier</h3>
+        <p>Tamil Nadu Police Forensic Ledger &middot; Verified Digital Identity</p>
+      </div>
+      <button class="modal-close-btn" onclick="closeOfficerProfileModal()" title="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      
+      <div class="profile-dossier-card">
+        <div class="profile-avatar-frame">
+          <img id="profAvatarImg" src="" alt="Officer Passport Photo" />
+        </div>
+        <div>
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom: 6px;">
+            <h2 id="profOfficerName" style="margin:0; font-size: 20px; color: #0f172a;">Officer Name</h2>
+            <span class="badge-status-approved" id="profRoleBadge">POLICE</span>
+          </div>
+          <div id="profDesignationSubtitle" style="font-size: 13px; color: #64748b; margin-bottom: 16px;">Inspector of Police &middot; Cyber Crime Division</div>
+
+          <div class="profile-meta-grid">
+            <div class="meta-field">
+              <div class="lbl">Wallet Address</div>
+              <div class="val" id="profWalletAddress" style="font-family: var(--font-mono); font-size: 11.5px; word-break: break-all;">0x...</div>
+            </div>
+            <div class="meta-field">
+              <div class="lbl">Aadhaar Status</div>
+              <div class="val" style="color: #166534; font-size: 12px; font-weight: 700;">&#10003; UIDAI Verified</div>
+            </div>
+            <div class="meta-field">
+              <div class="lbl">Gender &amp; Age</div>
+              <div class="val" id="profGenderAge">Male, 34 yrs</div>
+            </div>
+            <div class="meta-field">
+              <div class="lbl">Date of Birth</div>
+              <div class="val" id="profDob">1990-05-12</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Update Information Form -->
+      <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px;">
+        <h4 style="margin: 0 0 14px 0; font-size: 14px; color: #0f172a; display: flex; align-items: center; gap: 6px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          Update Service &amp; Contact Details
+        </h4>
+
+        <div class="form-row-2">
+          <div class="reg-field-group">
+            <label for="profMobileInput">Mobile Number</label>
+            <input id="profMobileInput" type="tel" maxlength="10" placeholder="Mobile" />
+          </div>
+          <div class="reg-field-group">
+            <label for="profEmailInput">Official Email Address</label>
+            <input id="profEmailInput" type="email" placeholder="Email" />
+          </div>
+        </div>
+
+        <div class="reg-field-group" style="margin-top: 12px;">
+          <label for="profStationInput">Station / Lab / District Assignment</label>
+          <input id="profStationInput" placeholder="Station or Division name" />
+        </div>
+
+        <div style="margin-top: 18px; display: flex; align-items: center; justify-content: space-between;">
+          <div id="profUpdateStatus" style="font-size: 12.5px;"></div>
+          <button type="button" class="btn-primary" id="profSaveBtn" onclick="saveOfficerProfileUpdates()" style="padding: 10px 22px;">
+            Save Updates
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ MODAL 3: ADMIN ONBOARDING REVIEW DRAWER ═══════════════ -->
+<div class="evidex-modal-backdrop" id="adminRequestsModalBackdrop">
+  <div class="evidex-modal-container" style="max-width: 960px;">
+    <div class="modal-header">
+      <div class="modal-title-wrap">
+        <h3>Officer Access Applications (Administrative Review)</h3>
+        <p>Review KYC dossiers, verify live facial capture vs Aadhaar records, and authorize on-chain wallets</p>
+      </div>
+      <button class="modal-close-btn" onclick="closeAdminRequestsModal()" title="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="adminRequestsListContainer">
+        <div style="text-align:center; padding: 30px; color:#64748b;">Loading pending requests...</div>
+      </div>
     </div>
   </div>
 </div>

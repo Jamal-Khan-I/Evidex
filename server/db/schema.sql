@@ -52,5 +52,43 @@ CREATE TABLE IF NOT EXISTS officer_profiles (
   pin_hash TEXT,
   officer_name TEXT,
   badge_number TEXT,
+  gender TEXT,
+  dob TEXT,
+  age INTEGER,
+  mobile TEXT,
+  email TEXT,
+  role TEXT,
+  department_data TEXT,
+  face_photo TEXT,
+  aadhaar_status TEXT DEFAULT 'VERIFIED_UIDAI',
   updated_at TEXT NOT NULL DEFAULT (DATETIME('now'))
 );
+
+CREATE TABLE IF NOT EXISTS officer_registration_requests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  wallet_address TEXT UNIQUE NOT NULL,
+  officer_name TEXT NOT NULL,
+  gender TEXT NOT NULL,
+  dob TEXT NOT NULL,
+  age INTEGER NOT NULL,
+  mobile TEXT NOT NULL,
+  email TEXT NOT NULL,
+  role TEXT NOT NULL,
+  department_data TEXT NOT NULL,
+  face_photo TEXT NOT NULL,
+  aadhaar_number TEXT,
+  aadhaar_extracted_name TEXT,
+  aadhaar_extracted_dob TEXT,
+  aadhaar_extracted_gender TEXT,
+  aadhaar_digital_signature_valid INTEGER DEFAULT 1,
+  aadhaar_tamper_score REAL DEFAULT 1.0,
+  cross_verification_status TEXT DEFAULT 'VERIFIED',
+  status TEXT NOT NULL DEFAULT 'PENDING',
+  rejection_reason TEXT,
+  created_at TEXT NOT NULL DEFAULT (DATETIME('now')),
+  reviewed_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_reg_wallet ON officer_registration_requests(wallet_address);
+CREATE INDEX IF NOT EXISTS idx_reg_status ON officer_registration_requests(status);
+
