@@ -149,29 +149,15 @@
       <div class="role-box-header">
         <div class="role-box-top-row">
           <span class="role-pill-badge" id="sidebarRolePill">POLICE</span>
-          <span class="testing-mode-pill">🧪 Test Mode</span>
+          <span class="uidai-verified-pill" id="sidebarUidaiPill">✓ Authorized</span>
         </div>
         <div class="role-box-title" id="sidebarMenuTitle">Police Operations</div>
         <div class="role-box-subtitle" id="sidebarOfficerDept">Tamil Nadu Police</div>
       </div>
 
-      <!-- Testing Role Switcher: Enables unregistered wallet testing & role identification -->
-      <div class="test-role-switcher-box">
-        <div class="test-switcher-title">
-          <span>Testing Role:</span>
-          <span style="font-size:9.5px; color:#10b981; font-weight:700;">Unregistered Allowed</span>
-        </div>
-        <div class="test-pills-grid">
-          <button class="test-pill-btn active" id="pill-test-POLICE" onclick="setTestingRole('POLICE')">👮 Investigator</button>
-          <button class="test-pill-btn" id="pill-test-FORENSICS" onclick="setTestingRole('FORENSICS')">🔬 Lab</button>
-          <button class="test-pill-btn" id="pill-test-COURT" onclick="setTestingRole('COURT')">⚖️ Court</button>
-          <button class="test-pill-btn" id="pill-test-ADMIN" onclick="setTestingRole('ADMIN')">🛡️ Admin</button>
-        </div>
-      </div>
-
       <!-- Navigation Section Label -->
       <div class="sidebar-section-title">
-        <span>Options</span>
+        <span>Operations</span>
       </div>
 
       <!-- Role-Specific Navigation Buttons (Square Box) -->
@@ -184,7 +170,7 @@
         <div class="wallet-status-dot"></div>
         <div class="wallet-text-col">
           <div class="wallet-addr-label" id="sidebarWalletPreview">0x...</div>
-          <div class="wallet-role-sub" id="sidebarWalletRoleSub">Full Testing Access</div>
+          <div class="wallet-role-sub" id="sidebarWalletRoleSub">Authorized Role Access</div>
         </div>
       </div>
     </aside>
@@ -204,6 +190,24 @@
           <div class="w-stat"><strong id="wStatPending">0</strong> Pending</div>
           <div class="w-stat-sep">/</div>
           <div class="w-stat"><strong id="wStatVerified">0</strong> Verified</div>
+        </div>
+      </div>
+
+      <!-- ACCESS DENIED PANEL (SHOWN FOR ANY UNAUTHORIZED WALLET) -->
+      <div class="workspace-panel" id="panel-access-denied" style="display:none;">
+        <div class="panel-card" style="text-align:center; padding: 60px 24px; max-width:640px; margin: 40px auto; border: 1.5px solid #fecaca; background: #fff5f5;">
+          <div style="width:64px; height:64px; border-radius:50%; background:#fee2e2; color:#ef4444; display:inline-flex; align-items:center; justify-content:center; margin-bottom:18px;">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+          </div>
+          <h2 style="font-size:22px; font-weight:800; color:#0f172a; margin-bottom:10px;">Access Denied · Unauthorized Address</h2>
+          <p style="font-size:14px; color:#64748b; line-height:1.6; max-width:480px; margin:0 auto 24px;">
+            The connected wallet address <br><strong id="unauthorizedAddressDisplay" style="font-family:var(--font-mono); color:#b91c1c; font-size:13px; word-break:break-all;"></strong><br>is not authorized to access Evidex. Access is strictly granted to designated department officer wallets.
+          </p>
+          <div style="display:flex; justify-content:center; gap:12px;">
+            <button class="btn-primary" onclick="logoutAccount()" style="background:#0f172a; color:#fff; padding:10px 22px; border-radius:9999px; font-weight:600; cursor:pointer;">
+              Disconnect / Switch Account in MetaMask
+            </button>
+          </div>
         </div>
       </div>
 

@@ -55,6 +55,64 @@ function initDatabase() {
         FROM evidence_records WHERE case_number IS NOT NULL AND case_number != '';
       `);
     } catch(e) {}
+
+    // Seed authorized department roster for the 4 specific role addresses
+    const authorizedRoster = [
+      {
+        wallet_address: '0x21815A6006830098c1aF1e8f1c2ce7793589CeEA',
+        officer_name: 'State System Administrator',
+        badge_number: 'HQ-ADMIN-001',
+        gender: 'Male',
+        mobile: '+91 94440 11001',
+        email: 'admin.evidex@tn.gov.in',
+        role: 'ADMIN',
+        department_data: JSON.stringify({ unit: 'State Headquarters', jurisdiction: 'Statewide' })
+      },
+      {
+        wallet_address: '0x40386f4eC88BF501a562d4552Ef9fF6eAdfA69Da',
+        officer_name: 'Inspector K. Ramanathan',
+        badge_number: 'TNP-INSP-4038',
+        gender: 'Male',
+        mobile: '+91 94440 22002',
+        email: 'ramanathan.k@tnpolice.gov.in',
+        role: 'POLICE',
+        department_data: JSON.stringify({ policeStation: 'Tamil Nadu Police - Cyber Cell', district: 'Chennai City' })
+      },
+      {
+        wallet_address: '0x49cE35eF0dD62AD68072b5Eb1A44007E2CB999e6',
+        officer_name: 'Dr. S. Meenakshi',
+        badge_number: 'FSL-ANL-49CE',
+        gender: 'Female',
+        mobile: '+91 94440 33003',
+        email: 'meenakshi.s@fsl.tn.gov.in',
+        role: 'FORENSICS',
+        department_data: JSON.stringify({ labId: 'State Forensic Science Laboratory', division: 'Digital Forensics Division' })
+      },
+      {
+        wallet_address: '0x1093aA4d7ff9eAdfBBf2AcFF370D1bd5dafF902d',
+        officer_name: 'Hon. Judge R. Sundaram',
+        badge_number: 'JUD-BENCH-1093',
+        gender: 'Male',
+        mobile: '+91 94440 44004',
+        email: 'magistrate.sundaram@tncourts.gov.in',
+        role: 'COURT',
+        department_data: JSON.stringify({ courtName: 'Principal Sessions Court', bench: 'Special Cyber Court' })
+      }
+    ];
+
+    for (const off of authorizedRoster) {
+      try {
+        db.prepare(`
+          INSERT INTO officer_profiles (wallet_address, officer_name, badge_number, gender, mobile, email, role, department_data, aadhaar_status)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'VERIFIED_UIDAI')
+          ON CONFLICT(wallet_address) DO UPDATE SET
+            role = excluded.role,
+            officer_name = excluded.officer_name,
+            badge_number = excluded.badge_number,
+            department_data = excluded.department_data;
+        `).run(off.wallet_address, off.officer_name, off.badge_number, off.gender, off.mobile, off.email, off.role, off.department_data);
+      } catch (e) {}
+    }
   } catch (migErr) {
     console.warn('[Database] Migration notice:', migErr.message);
   }

@@ -1090,85 +1090,96 @@ window.addEventListener("DOMContentLoaded", () => {
 let connectedAddress = null;
 let isCurrentUserAdmin = false;
 let currentUserRole = "POLICE";
-let testingRoleOverride = null;
 
-function setTestingRole(role) {
-  const cleanRole = (role || "POLICE").toUpperCase();
-  testingRoleOverride = cleanRole;
-  currentUserRole = cleanRole;
-
-  if (connectedAddress) {
-    localStorage.setItem("evidex_test_role_" + connectedAddress.toLowerCase(), cleanRole);
+// ═══════════════════════════════════════════════════════════════════
+// AUTHORIZED DEPARTMENT ROLES & WALLET REGISTRY
+// ═══════════════════════════════════════════════════════════════════
+const AUTHORIZED_ROLES = {
+  "0x21815a6006830098c1af1e8f1c2ce7793589ceea": {
+    role: "ADMIN",
+    title: "System Administration",
+    dept: "State Forensic Headquarters",
+    officerName: "State System Administrator",
+    badge: "HQ-ADMIN-001"
+  },
+  "0x40386f4ec88bf501a562d4552ef9ff6eadfa69da": {
+    role: "POLICE",
+    title: "Police Operations",
+    dept: "Tamil Nadu Police Department",
+    officerName: "Inspector K. Ramanathan",
+    badge: "TNP-INSP-4038"
+  },
+  "0x49ce35ef0dd62ad68072b5eb1a44007e2cb999e6": {
+    role: "FORENSICS",
+    title: "Forensic Laboratory",
+    dept: "State Forensic Science Laboratory",
+    officerName: "Dr. S. Meenakshi",
+    badge: "FSL-ANL-49CE"
+  },
+  "0x1093aa4d7ff9eadfbbf2acff370d1bd5daff902d": {
+    role: "COURT",
+    title: "Judicial Bench",
+    dept: "Judicial Court of Law",
+    officerName: "Hon. Judge R. Sundaram",
+    badge: "JUD-BENCH-1093"
   }
-  localStorage.setItem("evidex_active_test_role", cleanRole);
-
-  const badge = document.getElementById("roleBadge");
-  if (badge) {
-    badge.innerText = cleanRole;
-    badge.classList.add("assigned");
-  }
-
-  updateTestPillsUI(cleanRole);
-  setupRoleWorkspace(cleanRole);
-  loadStats();
-}
-
-function updateTestPillsUI(role) {
-  const cleanRole = (role || "POLICE").toUpperCase();
-  document.querySelectorAll(".test-pill-btn").forEach(btn => {
-    btn.classList.remove("active");
-  });
-  const activeBtn = document.getElementById("pill-test-" + cleanRole);
-  if (activeBtn) activeBtn.classList.add("active");
-}
+};
 
 async function refreshRoleBadge(address) {
   connectedAddress = address;
-  try {
-    const badge = document.getElementById("roleBadge");
-    const adminAddr = await contract.admin();
-    isCurrentUserAdmin = adminAddr.toLowerCase() === address.toLowerCase();
+  const lowerAddr = (address || "").toLowerCase();
+  const authEntry = AUTHORIZED_ROLES[lowerAddr];
 
-    // Check if the user previously selected a testing role for this wallet
-    const savedTestRole = localStorage.getItem("evidex_test_role_" + address.toLowerCase()) 
-      || localStorage.getItem("evidex_active_test_role");
+  const badge = document.getElementById("roleBadge");
+  const accessDeniedPanel = document.getElementById("panel-access-denied");
+  const roleSidebar = document.getElementById("roleSidebar");
 
-    if (savedTestRole) {
-      currentUserRole = savedTestRole.toUpperCase();
-      testingRoleOverride = currentUserRole;
-    } else if (currentOfficerProfile && currentOfficerProfile.role) {
-      currentUserRole = currentOfficerProfile.role.toUpperCase();
-    } else {
-      const role = await contract.getRole(address);
-      const roleName = await resolveRoleName(role);
-      if (role === 2 || (roleName && roleName.toUpperCase().includes("LAB"))) {
-        currentUserRole = "FORENSICS";
-      } else if (role === 3 || (roleName && roleName.toUpperCase().includes("COURT"))) {
-        currentUserRole = "COURT";
-      } else if (role === 1 || (roleName && roleName.toUpperCase().includes("POLICE"))) {
-        currentUserRole = "POLICE";
-      } else if (isCurrentUserAdmin) {
-        currentUserRole = "ADMIN";
-      } else {
-        // Unregistered wallet: default to POLICE (Investigator) for testing
-        currentUserRole = "POLICE";
-      }
-    }
+  if (!authEntry) {
+    // Access Denied: Wallet is not in authorized list
+    currentUserRole = null;
+    isCurrentUserAdmin = false;
 
     if (badge) {
-      badge.innerText = currentUserRole;
-      badge.classList.add("assigned");
+      badge.innerText = "Unauthorized";
+      badge.classList.remove("assigned");
+      badge.style.background = "#fee2e2";
+      badge.style.color = "#dc2626";
     }
 
-    updateTestPillsUI(currentUserRole);
-    setupRoleWorkspace(currentUserRole);
-    await loadSafetyStatus();
-  } catch (e) {
-    const fallbackRole = localStorage.getItem("evidex_active_test_role") || "POLICE";
-    currentUserRole = fallbackRole;
-    updateTestPillsUI(currentUserRole);
-    setupRoleWorkspace(currentUserRole);
+    if (roleSidebar) roleSidebar.style.display = "none";
+
+    document.querySelectorAll(".workspace-panel").forEach(p => p.classList.remove("active"));
+    if (accessDeniedPanel) {
+      accessDeniedPanel.style.display = "block";
+      accessDeniedPanel.classList.add("active");
+      const unauthAddrEl = document.getElementById("unauthorizedAddressDisplay");
+      if (unauthAddrEl) unauthAddrEl.textContent = address;
+    }
+
+    const titleEl = document.getElementById("workspacePanelTitle");
+    const eyeEl = document.getElementById("workspaceRoleEyebrow");
+    if (titleEl) titleEl.textContent = "Access Restricted";
+    if (eyeEl) eyeEl.textContent = "Evidex Security · Unauthorized Wallet";
+
+    return;
   }
+
+  // Wallet is Authorized!
+  if (roleSidebar) roleSidebar.style.display = "flex";
+  if (accessDeniedPanel) accessDeniedPanel.style.display = "none";
+
+  currentUserRole = authEntry.role;
+  isCurrentUserAdmin = currentUserRole === "ADMIN";
+
+  if (badge) {
+    badge.innerText = authEntry.role;
+    badge.classList.add("assigned");
+    badge.style.background = "";
+    badge.style.color = "";
+  }
+
+  setupRoleWorkspace(currentUserRole);
+  await loadSafetyStatus();
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1176,7 +1187,11 @@ async function refreshRoleBadge(address) {
 // ═══════════════════════════════════════════════════════════════════
 
 function setupRoleWorkspace(role) {
-  currentUserRole = (testingRoleOverride || role || "POLICE").toUpperCase();
+  const lowerAddr = (connectedAddress || "").toLowerCase();
+  const authEntry = AUTHORIZED_ROLES[lowerAddr];
+
+  currentUserRole = authEntry ? authEntry.role : (role || "POLICE").toUpperCase();
+  isCurrentUserAdmin = currentUserRole === "ADMIN";
 
   const deptEl = document.getElementById("sidebarOfficerDept");
   const rolePillEl = document.getElementById("sidebarRolePill");
@@ -1189,25 +1204,12 @@ function setupRoleWorkspace(role) {
     walletPreviewEl.textContent = connectedAddress.slice(0, 8) + "..." + connectedAddress.slice(-6);
   }
 
-  const roleTitles = {
-    POLICE: "Police Operations",
-    FORENSICS: "Forensic Laboratory",
-    COURT: "Judicial Bench",
-    ADMIN: "System Administration"
-  };
-  const deptTitles = {
-    POLICE: "Tamil Nadu Police · Investigation",
-    FORENSICS: "State Forensic Science Laboratory",
-    COURT: "Judicial Court of Law",
-    ADMIN: "State Forensic Headquarters"
-  };
-  if (menuTitleEl) menuTitleEl.textContent = roleTitles[currentUserRole] || "Operations";
-  if (deptEl) deptEl.textContent = deptTitles[currentUserRole] || "Evidex Forensic Network";
+  if (menuTitleEl) menuTitleEl.textContent = authEntry?.title || "Operations";
+  if (deptEl) deptEl.textContent = authEntry?.dept || "Evidex Network";
   if (walletRoleSubEl) {
-    walletRoleSubEl.textContent = isCurrentUserAdmin ? "Contract Admin · Testing" : "Active Role: " + currentUserRole;
+    walletRoleSubEl.textContent = `Authorized · ${currentUserRole}`;
   }
 
-  updateTestPillsUI(currentUserRole);
   renderRoleSidebar(currentUserRole);
 }
 
