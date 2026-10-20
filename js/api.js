@@ -109,13 +109,13 @@
       }
     },
 
-    // Verify Aadhaar PDF authenticity & cross-check with form details
-    async verifyAadhaar(pdfBase64, officerName, dob, gender) {
+    // Verify Aadhaar PDF authenticity & cross-check with form details (supports encrypted and unlocked PDFs)
+    async verifyAadhaar(pdfBase64, officerName, dob, gender, password = '') {
       try {
         const res = await fetch(`${API_BASE}/auth/verify-aadhaar`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pdfBase64, officerName, dob, gender })
+          body: JSON.stringify({ pdfBase64, officerName, dob, gender, password })
         });
         return await res.json();
       } catch (err) {

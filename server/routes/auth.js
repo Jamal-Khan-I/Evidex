@@ -8,7 +8,7 @@ const { sendApprovalEmail, sendRejectionEmail } = require('../services/emailServ
 // POST /api/auth/verify-aadhaar - Real-time Aadhaar PDF validation and cross-check
 router.post('/verify-aadhaar', async (req, res, next) => {
   try {
-    const { pdfBase64, officerName, dob, gender } = req.body;
+    const { pdfBase64, officerName, dob, gender, password } = req.body;
 
     if (!pdfBase64) {
       return res.status(400).json({ success: false, error: 'Aadhaar PDF data is required.' });
@@ -17,7 +17,7 @@ router.post('/verify-aadhaar', async (req, res, next) => {
     const cleanBase64 = pdfBase64.replace(/^data:application\/pdf;base64,/, '');
     const buffer = Buffer.from(cleanBase64, 'base64');
 
-    const result = await verifyAadhaarDocument(buffer, { officerName, dob, gender });
+    const result = await verifyAadhaarDocument(buffer, { officerName, dob, gender, password });
     res.json(result);
   } catch (err) {
     next(err);
