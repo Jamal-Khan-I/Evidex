@@ -679,11 +679,13 @@
             </div>
           </div>
 
-          <!-- MetaMask Wallet Address (Manual Entry - Not Connected Yet) -->
+          <!-- MetaMask Wallet Address (Manual Entry or Auto-fill) -->
           <div class="reg-field-group">
-            <label for="regWalletAddress">
-              MetaMask Wallet Address (0x...) 
-              <span class="opt" style="color: #2563eb; font-weight: 500;">Manual paste required (Do not connect yet)</span>
+            <label for="regWalletAddress" style="display: flex; justify-content: space-between; align-items: center;">
+              <span>MetaMask Wallet Address (0x...)</span>
+              <button type="button" class="btn-wallet-fetch" onclick="autoFillWalletAddress()" title="Read your address from MetaMask extension">
+                Auto-fill from MetaMask
+              </button>
             </label>
             <input id="regWalletAddress" placeholder="Paste your 42-character Ethereum address (e.g. 0xAbC123...)" oninput="validateWalletAddressInput(this.value)" style="font-family: var(--font-mono); font-size: 12.5px;" />
             <div id="regWalletValidationMsg" style="font-size: 11.5px; margin-top: 2px;"></div>
@@ -805,12 +807,42 @@
             </div>
           </div>
 
+          <!-- Application Checklist & Readiness Tracker -->
+          <div class="reg-readiness-checklist" id="regReadinessChecklist">
+            <div class="readiness-header">
+              <span class="readiness-title">Application Readiness Checklist</span>
+              <span class="readiness-count" id="regReadinessCount">0 of 5 Completed</span>
+            </div>
+            <div class="readiness-grid">
+              <div class="readiness-step incomplete" id="stepPhoto">
+                <span class="step-icon">✕</span>
+                <span class="step-text">Live Face Photo</span>
+              </div>
+              <div class="readiness-step incomplete" id="stepPersonal">
+                <span class="step-icon">✕</span>
+                <span class="step-text">Officer Personal Info</span>
+              </div>
+              <div class="readiness-step incomplete" id="stepWallet">
+                <span class="step-icon">✕</span>
+                <span class="step-text">MetaMask Wallet (0x...)</span>
+              </div>
+              <div class="readiness-step incomplete" id="stepDept">
+                <span class="step-icon">✕</span>
+                <span class="step-text">Department Credentials</span>
+              </div>
+              <div class="readiness-step incomplete" id="stepAadhaar" style="grid-column: span 2;">
+                <span class="step-icon">✕</span>
+                <span class="step-text">e-Aadhaar PDF Verified</span>
+              </div>
+            </div>
+          </div>
+
           <!-- Submit Request Button -->
-          <div style="margin-top: 8px;">
-            <button type="button" class="btn-primary btn-block" id="regSubmitBtn" disabled onclick="submitOfficerRegistration()" style="padding: 13px; font-size: 14px; font-weight: 700;">
+          <div style="margin-top: 14px;">
+            <button type="button" class="btn-primary btn-block" id="regSubmitBtn" onclick="submitOfficerRegistration()" style="padding: 13px; font-size: 14px; font-weight: 700; cursor: pointer;">
               Submit Access Request for Department Review
             </button>
-            <div id="regStatusNotice" style="margin-top: 8px; font-size: 12.5px; text-align: center;"></div>
+            <div id="regStatusNotice" style="margin-top: 10px; font-size: 12.5px; text-align: center;"></div>
           </div>
 
         </div>

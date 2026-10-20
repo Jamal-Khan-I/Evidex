@@ -2874,6 +2874,84 @@ footer {
   height: 14px;
 }
 
+/* Readiness Checklist in Registration */
+.reg-readiness-checklist {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-top: 14px;
+}
+
+.readiness-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 8px;
+}
+
+.readiness-count {
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.readiness-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+}
+
+.readiness-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.readiness-step.incomplete {
+  color: #64748b;
+  background: #f1f5f9;
+}
+
+.readiness-step.incomplete .step-icon {
+  color: #94a3b8;
+  font-weight: 800;
+}
+
+.readiness-step.complete {
+  color: #166534;
+  background: #dcfce7;
+  font-weight: 600;
+}
+
+.readiness-step.complete .step-icon {
+  color: #15803d;
+  font-weight: 900;
+}
+
+.btn-wallet-fetch {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-wallet-fetch:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
 /* Profile Modal Cards */
 .profile-dossier-card {
   display: grid;

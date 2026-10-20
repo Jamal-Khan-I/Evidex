@@ -4050,9 +4050,28 @@ function handleRoleSelectionChange(role) {
   validateRegistrationForm();
 }
 
+async function autoFillWalletAddress() {
+  if (window.ethereum) {
+    try {
+      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      if (accounts && accounts[0]) {
+        const input = document.getElementById("regWalletAddress");
+        if (input) {
+          input.value = accounts[0];
+          validateWalletAddressInput(accounts[0]);
+        }
+      }
+    } catch (err) {
+      alert("Could not read address from MetaMask: " + err.message);
+    }
+  } else {
+    alert("MetaMask browser extension not detected. Please paste your 0x wallet address manually.");
+  }
+}
+
 function validateWalletAddressInput(val) {
   const msgEl = document.getElementById("regWalletValidationMsg");
-  const trimmed = (val || "").trim();
+  const trimmed = (val || "").trim().replace(/['"]/g, '');
 
   if (!trimmed) {
     isWalletAddressFormatValid = false;
@@ -4069,7 +4088,7 @@ function validateWalletAddressInput(val) {
   } else {
     isWalletAddressFormatValid = false;
     if (msgEl) {
-      msgEl.innerText = "✕ Invalid format (must begin with 0x followed by 40 hex characters)";
+      msgEl.innerText = `✕ Format invalid: Must start with 0x and have 42 hex characters (currently ${trimmed.length} chars)`;
       msgEl.style.color = "#b91c1c";
     }
   }
@@ -4189,35 +4208,135 @@ async function handleAadhaarFileUpload(event) {
   reader.readAsDataURL(file);
 }
 
-function validateRegistrationForm() {
-  const submitBtn = document.getElementById("regSubmitBtn");
-  if (!submitBtn) return;
-
+function getMissingRegistrationFields() {
+  const issues = [];
   const name = (document.getElementById("regOfficerName")?.value || "").trim();
   const dob = document.getElementById("regDob")?.value || "";
-  const mobile = (document.getElementById("regMobile")?.value || "").trim();
+  const mobileRaw = (document.getElementById("regMobile")?.value || "").trim();
+  const mobileDigits = mobileRaw.replace(/\D/g, '').slice(-10);
   const email = (document.getElementById("regEmail")?.value || "").trim();
+  const wallet = (document.getElementById("regWalletAddress")?.value || "").trim().replace(/['"]/g, '');
   const role = document.getElementById("regRole")?.value || "POLICE";
 
-  let roleFieldsValid = true;
+  if (!capturedPassportPhotoBase64) {
+    issues.push({ field: 'regCaptureBtn', msg: 'Face Photo: Click the "Capture Face Photo" button under the camera.' });
+  }
+  if (name.length < 3) {
+    issues.push({ field: 'regOfficerName', msg: 'Full Name: Please enter your full name as in official records (at least 3 characters).' });
+  }
+  if (!dob) {
+    issues.push({ field: 'regDob', msg: 'Date of Birth: Please select your date of birth.' });
+  }
+  if (mobileDigits.length !== 10) {
+    issues.push({ field: 'regMobile', msg: 'Mobile Number: Please enter a valid 10-digit mobile number.' });
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    issues.push({ field: 'regEmail', msg: 'Email Address: Please enter a valid official email address.' });
+  }
+  if (!wallet || !/^0x[a-fA-F0-9]{40}$/.test(wallet)) {
+    issues.push({ field: 'regWalletAddress', msg: 'MetaMask Wallet: Please enter your 42-character Ethereum address (starts with 0x).' });
+  }
   if (role === "POLICE") {
     const station = (document.getElementById("regPoliceStation")?.value || "").trim();
     const badge = (document.getElementById("regBadgeNumber")?.value || "").trim();
-    roleFieldsValid = station.length >= 2 && badge.length >= 2;
+    if (station.length < 2) issues.push({ field: 'regPoliceStation', msg: 'Police Station: Please enter your police station name & code.' });
+    if (badge.length < 2) issues.push({ field: 'regBadgeNumber', msg: 'Badge Number: Please enter your badge / constabulary number.' });
   } else if (role === "FORENSICS") {
     const lab = (document.getElementById("regLabId")?.value || "").trim();
-    roleFieldsValid = lab.length >= 2;
+    if (lab.length < 2) issues.push({ field: 'regLabId', msg: 'Lab ID: Please enter your forensic lab name & ID.' });
   } else if (role === "COURT") {
     const court = (document.getElementById("regCourtName")?.value || "").trim();
-    roleFieldsValid = court.length >= 2;
+    if (court.length < 2) issues.push({ field: 'regCourtName', msg: 'Court: Please enter your court complex & jurisdiction.' });
+  }
+  if (!verifiedAadhaarData) {
+    issues.push({ field: 'regAadhaarDropzone', msg: 'e-Aadhaar PDF: Please upload your e-Aadhaar PDF for demographic cross-verification.' });
+  }
+  return issues;
+}
+
+function updateReadinessStep(elementId, isDone, label) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  if (isDone) {
+    el.className = "readiness-step complete";
+    el.innerHTML = `<span class="step-icon">✓</span><span class="step-text">${label}</span>`;
+  } else {
+    el.className = "readiness-step incomplete";
+    el.innerHTML = `<span class="step-icon">✕</span><span class="step-text">${label}</span>`;
+  }
+}
+
+function validateRegistrationForm() {
+  const name = (document.getElementById("regOfficerName")?.value || "").trim();
+  const dob = document.getElementById("regDob")?.value || "";
+  const mobileRaw = (document.getElementById("regMobile")?.value || "").trim();
+  const mobileDigits = mobileRaw.replace(/\D/g, '').slice(-10);
+  const email = (document.getElementById("regEmail")?.value || "").trim();
+  const wallet = (document.getElementById("regWalletAddress")?.value || "").trim().replace(/['"]/g, '');
+  const role = document.getElementById("regRole")?.value || "POLICE";
+
+  // Step 1: Face Photo
+  const photoDone = !!capturedPassportPhotoBase64;
+  updateReadinessStep("stepPhoto", photoDone, "Live Face Photo");
+
+  // Step 2: Officer Personal Info
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const personalDone = name.length >= 3 && !!dob && mobileDigits.length === 10 && emailValid;
+  updateReadinessStep("stepPersonal", personalDone, "Officer Personal Info");
+
+  // Step 3: MetaMask Wallet
+  const walletDone = isWalletAddressFormatValid && !!wallet && /^0x[a-fA-F0-9]{40}$/.test(wallet);
+  updateReadinessStep("stepWallet", walletDone, "MetaMask Wallet");
+
+  // Step 4: Department Info
+  let deptDone = true;
+  if (role === "POLICE") {
+    const station = (document.getElementById("regPoliceStation")?.value || "").trim();
+    const badge = (document.getElementById("regBadgeNumber")?.value || "").trim();
+    deptDone = station.length >= 2 && badge.length >= 2;
+  } else if (role === "FORENSICS") {
+    const lab = (document.getElementById("regLabId")?.value || "").trim();
+    deptDone = lab.length >= 2;
+  } else if (role === "COURT") {
+    const court = (document.getElementById("regCourtName")?.value || "").trim();
+    deptDone = court.length >= 2;
+  }
+  updateReadinessStep("stepDept", deptDone, "Department Credentials");
+
+  // Step 5: e-Aadhaar PDF
+  const aadhaarDone = !!verifiedAadhaarData;
+  updateReadinessStep("stepAadhaar", aadhaarDone, "e-Aadhaar PDF Verified");
+
+  // Update total count
+  const completed = [photoDone, personalDone, walletDone, deptDone, aadhaarDone].filter(Boolean).length;
+  const countEl = document.getElementById("regReadinessCount");
+  if (countEl) {
+    countEl.innerText = `${completed} of 5 Completed`;
+    countEl.style.color = completed === 5 ? "#166534" : (completed >= 3 ? "#2563eb" : "#64748b");
   }
 
-  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  const mobileValid = mobile.length === 10;
-  const isFormComplete = name.length >= 3 && dob && mobileValid && emailValid &&
-    isWalletAddressFormatValid && capturedPassportPhotoBase64 && roleFieldsValid && verifiedAadhaarData;
+  // Clear notice once completed
+  const statusNotice = document.getElementById("regStatusNotice");
+  if (completed === 5 && statusNotice && statusNotice.innerHTML.includes("Please complete the following")) {
+    statusNotice.innerHTML = "";
+    statusNotice.style.background = "none";
+    statusNotice.style.border = "none";
+    statusNotice.style.padding = "0";
+  }
 
-  submitBtn.disabled = !isFormComplete;
+  const submitBtn = document.getElementById("regSubmitBtn");
+  if (submitBtn) {
+    if (completed === 5) {
+      submitBtn.style.opacity = "1";
+      submitBtn.style.background = "#2563eb";
+      submitBtn.style.boxShadow = "0 4px 14px rgba(37, 99, 235, 0.35)";
+      submitBtn.innerHTML = `✓ Ready &mdash; Submit Access Request for Department Review`;
+    } else {
+      submitBtn.style.opacity = "0.9";
+      submitBtn.style.boxShadow = "none";
+      submitBtn.innerHTML = `Submit Access Request for Department Review (${completed}/5)`;
+    }
+  }
 }
 
 // ── SUBMIT REGISTRATION REQUEST ──
@@ -4225,13 +4344,57 @@ async function submitOfficerRegistration() {
   const submitBtn = document.getElementById("regSubmitBtn");
   const statusNotice = document.getElementById("regStatusNotice");
 
+  const issues = getMissingRegistrationFields();
+  if (issues.length > 0) {
+    if (statusNotice) {
+      statusNotice.style.color = "#b91c1c";
+      statusNotice.style.background = "#fef2f2";
+      statusNotice.style.border = "1px solid #fecaca";
+      statusNotice.style.borderRadius = "8px";
+      statusNotice.style.padding = "10px 14px";
+      statusNotice.style.textAlign = "left";
+      statusNotice.innerHTML = `
+        <div style="font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+          <span style="font-size: 15px;">⚠️</span>
+          <span>Please complete the following ${issues.length} item${issues.length > 1 ? 's' : ''} to submit your request:</span>
+        </div>
+        <ul style="margin: 0; padding-left: 18px; font-size: 12px; line-height: 1.7;">
+          ${issues.map(i => `<li>${i.msg}</li>`).join('')}
+        </ul>
+      `;
+    }
+    const firstField = document.getElementById(issues[0].field);
+    if (firstField) {
+      firstField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      firstField.focus();
+      const prevBorder = firstField.style.borderColor;
+      firstField.style.borderColor = '#ef4444';
+      firstField.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.25)';
+      setTimeout(() => {
+        firstField.style.borderColor = prevBorder;
+        firstField.style.boxShadow = '';
+      }, 3500);
+    }
+    return;
+  }
+
+  // Clear notice and show submission state
+  if (statusNotice) {
+    statusNotice.style.background = "none";
+    statusNotice.style.border = "none";
+    statusNotice.style.padding = "0";
+    statusNotice.style.textAlign = "center";
+    statusNotice.style.color = "#2563eb";
+    statusNotice.innerText = "Submitting official onboarding application...";
+  }
+
   const officerName = (document.getElementById("regOfficerName")?.value || "").trim();
   const gender = document.getElementById("regGender")?.value || "Male";
   const dob = document.getElementById("regDob")?.value || "";
   const age = parseInt(document.getElementById("regAge")?.value, 10) || 30;
-  const mobile = (document.getElementById("regMobile")?.value || "").trim();
+  const mobile = (document.getElementById("regMobile")?.value || "").trim().replace(/\D/g, '').slice(-10);
   const email = (document.getElementById("regEmail")?.value || "").trim();
-  const walletAddress = (document.getElementById("regWalletAddress")?.value || "").trim();
+  const walletAddress = (document.getElementById("regWalletAddress")?.value || "").trim().replace(/['"]/g, '');
   const role = document.getElementById("regRole")?.value || "POLICE";
 
   let departmentData = {};
@@ -4279,30 +4442,50 @@ async function submitOfficerRegistration() {
     if (res.success) {
       if (statusNotice) {
         statusNotice.style.color = "#166534";
-        statusNotice.innerHTML = `<strong>✓ Request Submitted Successfully!</strong><br>Your credentials have been submitted for departmental review. You will receive an email at <strong>${email}</strong> once approved.`;
+        statusNotice.style.background = "#dcfce7";
+        statusNotice.style.border = "1px solid #86efac";
+        statusNotice.style.borderRadius = "8px";
+        statusNotice.style.padding = "12px 16px";
+        statusNotice.style.textAlign = "left";
+        statusNotice.innerHTML = `
+          <div style="font-weight: 700; font-size: 13.5px; margin-bottom: 4px;">✓ Request Submitted Successfully!</div>
+          <div style="font-size: 12px; line-height: 1.5; color: #14532d;">
+            Your credentials have been submitted for departmental review. You will receive an official approval email at <strong>${email}</strong> once the System Administrator authorizes your wallet (<code>${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}</code>).
+          </div>
+        `;
       }
       setTimeout(() => {
         closeRegisterModal();
         alert("Registration Request Submitted Successfully!\n\nYour application has been received. The System Administrator will review your credentials and live photo against official records. Once approved, you will receive an official notification email and your wallet (" + walletAddress.slice(0,6) + "..." + walletAddress.slice(-4) + ") will be authorized to log in.");
-      }, 1500);
+      }, 1800);
     } else {
       if (statusNotice) {
         statusNotice.style.color = "#b91c1c";
-        statusNotice.innerText = "✕ Submission failed: " + (res.error || "Please try again.");
+        statusNotice.style.background = "#fef2f2";
+        statusNotice.style.border = "1px solid #fecaca";
+        statusNotice.style.borderRadius = "8px";
+        statusNotice.style.padding = "10px 14px";
+        statusNotice.style.textAlign = "left";
+        statusNotice.innerText = "✕ Submission failed: " + (res.error || "Please check your inputs and try again.");
       }
       if (submitBtn) {
         submitBtn.disabled = false;
-        submitBtn.innerText = "Submit Access Request for Department Review";
+        validateRegistrationForm();
       }
     }
   } catch (err) {
     if (statusNotice) {
       statusNotice.style.color = "#b91c1c";
-      statusNotice.innerText = "✕ Submission failed: " + err.message;
+      statusNotice.style.background = "#fef2f2";
+      statusNotice.style.border = "1px solid #fecaca";
+      statusNotice.style.borderRadius = "8px";
+      statusNotice.style.padding = "10px 14px";
+      statusNotice.style.textAlign = "left";
+      statusNotice.innerText = "✕ Network or server error: " + err.message;
     }
     if (submitBtn) {
       submitBtn.disabled = false;
-      submitBtn.innerText = "Submit Access Request for Department Review";
+      validateRegistrationForm();
     }
   }
 }
