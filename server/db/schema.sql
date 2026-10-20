@@ -92,3 +92,61 @@ CREATE TABLE IF NOT EXISTS officer_registration_requests (
 CREATE INDEX IF NOT EXISTS idx_reg_wallet ON officer_registration_requests(wallet_address);
 CREATE INDEX IF NOT EXISTS idx_reg_status ON officer_registration_requests(status);
 
+-- Cases Table
+CREATE TABLE IF NOT EXISTS cases (
+  case_number TEXT PRIMARY KEY,
+  fir_number TEXT,
+  police_station TEXT,
+  law_sections TEXT,
+  description TEXT,
+  registered_by TEXT,
+  officer_name TEXT,
+  case_key TEXT,
+  forensics_requested INTEGER DEFAULT 0,
+  forensics_status TEXT DEFAULT 'NOT_REQUIRED',
+  court_status TEXT DEFAULT 'PENDING',
+  case_status TEXT DEFAULT 'OPEN',
+  created_at TEXT NOT NULL DEFAULT (DATETIME('now')),
+  closed_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_cases_status ON cases(case_status);
+CREATE INDEX IF NOT EXISTS idx_cases_forensics ON cases(forensics_status);
+
+-- Forensic Reports Table
+CREATE TABLE IF NOT EXISTS forensic_reports (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  case_number TEXT NOT NULL,
+  report_title TEXT NOT NULL,
+  lab_name TEXT,
+  examiner_name TEXT,
+  findings TEXT,
+  file_name TEXT,
+  file_hash TEXT,
+  file_size INTEGER,
+  ipfs_cid TEXT,
+  submitter_address TEXT,
+  created_at TEXT NOT NULL DEFAULT (DATETIME('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_forensic_case ON forensic_reports(case_number);
+
+-- Court Reports Table
+CREATE TABLE IF NOT EXISTS court_reports (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  case_number TEXT NOT NULL,
+  court_name TEXT NOT NULL,
+  judge_name TEXT,
+  verdict TEXT,
+  orders_summary TEXT,
+  file_name TEXT,
+  file_hash TEXT,
+  file_size INTEGER,
+  ipfs_cid TEXT,
+  submitter_address TEXT,
+  created_at TEXT NOT NULL DEFAULT (DATETIME('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_court_case ON court_reports(case_number);
+
+

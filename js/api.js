@@ -184,6 +184,83 @@
       } catch (err) {
         return { success: false, error: err.message };
       }
+    },
+
+    // ── ROLE-BASED CASE WORKFLOW APIS ──
+    async getCases(role = 'POLICE', filter = 'all', search = '') {
+      try {
+        const res = await fetch(`${API_BASE}/cases?role=${encodeURIComponent(role)}&filter=${encodeURIComponent(filter)}&search=${encodeURIComponent(search)}`);
+        return await res.json();
+      } catch (err) {
+        return { success: false, cases: [], count: 0, error: err.message };
+      }
+    },
+
+    async getCaseDetails(caseNumber) {
+      try {
+        const res = await fetch(`${API_BASE}/cases/${encodeURIComponent(caseNumber)}`);
+        return await res.json();
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+    },
+
+    async registerCase(payload) {
+      try {
+        const res = await fetch(`${API_BASE}/cases`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        return await res.json();
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+    },
+
+    async submitForensicReport(caseNumber, payload) {
+      try {
+        const res = await fetch(`${API_BASE}/cases/${encodeURIComponent(caseNumber)}/forensic-report`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        return await res.json();
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+    },
+
+    async submitCourtReport(caseNumber, payload) {
+      try {
+        const res = await fetch(`${API_BASE}/cases/${encodeURIComponent(caseNumber)}/court-report`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        return await res.json();
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+    },
+
+    async getCaseBundle(caseNumber) {
+      try {
+        const res = await fetch(`${API_BASE}/cases/${encodeURIComponent(caseNumber)}/bundle`);
+        return await res.json();
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+    },
+
+    // Fetch approved Evidex officer roster (Admin User Information)
+    async getAdminUsers() {
+      try {
+        const res = await fetch(`${API_BASE}/auth/admin/users`);
+        return await res.json();
+      } catch (err) {
+        return { success: false, users: [], count: 0, error: err.message };
+      }
     }
   };
 

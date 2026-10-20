@@ -382,4 +382,32 @@ router.put('/profile/update', (req, res, next) => {
   }
 });
 
+// GET /api/auth/admin/users - Roster of all approved Evidex officers
+router.get('/admin/users', (req, res, next) => {
+  try {
+    const users = db.all('SELECT * FROM officer_profiles ORDER BY updated_at DESC');
+    const formatted = users.map(u => {
+      let dept = {};
+      try { dept = JSON.parse(u.department_data || '{}'); } catch(e) {}
+      return {
+        walletAddress: u.wallet_address,
+        officerName: u.officer_name,
+        role: u.role,
+        gender: u.gender,
+        dob: u.dob,
+        mobile: u.mobile,
+        email: u.email,
+        badgeNumber: u.badge_number,
+        departmentData: dept,
+        facePhoto: u.face_photo,
+        aadhaarStatus: u.aadhaar_status,
+        updatedAt: u.updated_at
+      };
+    });
+    res.json({ success: true, count: formatted.length, users: formatted });
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;

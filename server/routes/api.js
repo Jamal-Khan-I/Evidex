@@ -9,6 +9,7 @@ const evidenceRoutes = require('./evidence');
 const incidentRoutes = require('./incidents');
 const profileRoutes = require('./profile');
 const authRoutes = require('./auth');
+const casesRoutes = require('./cases');
 
 // GET /api/health - Server health & system telemetry
 router.get('/health', (req, res) => {
@@ -68,5 +69,6 @@ router.use('/evidence', evidenceRoutes);
 router.use('/incidents', incidentRoutes);
 router.use('/profile', profileRoutes);
 router.use('/auth', authRoutes);
+router.use('/cases', casesRoutes);
 
 module.exports = router;

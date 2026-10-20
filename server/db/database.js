@@ -47,6 +47,14 @@ function initDatabase() {
         db.exec(`ALTER TABLE officer_profiles ADD COLUMN ${col.name} ${col.type};`);
       }
     }
+    // Sync any existing cases from evidence_records
+    try {
+      db.exec(`
+        INSERT OR IGNORE INTO cases (case_number, description, registered_by, created_at)
+        SELECT DISTINCT case_number, description, submitter_address, created_at 
+        FROM evidence_records WHERE case_number IS NOT NULL AND case_number != '';
+      `);
+    } catch(e) {}
   } catch (migErr) {
     console.warn('[Database] Migration notice:', migErr.message);
   }

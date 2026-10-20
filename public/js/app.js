@@ -1089,6 +1089,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
 let connectedAddress = null;
 let isCurrentUserAdmin = false;
+let currentUserRole = "POLICE";
 
 async function refreshRoleBadge(address) {
   connectedAddress = address;
@@ -1098,60 +1099,979 @@ async function refreshRoleBadge(address) {
     isCurrentUserAdmin = adminAddr.toLowerCase() === address.toLowerCase();
 
     if (isCurrentUserAdmin) {
-      badge.innerText = "Admin";
-      badge.classList.add("assigned");
+      if (badge) { badge.innerText = "Admin"; badge.classList.add("assigned"); }
+      currentUserRole = "ADMIN";
     } else {
       const role = await contract.getRole(address);
-      badge.innerText = await resolveRoleName(role);
-      if (role !== 0) badge.classList.add("assigned");
-      else badge.classList.remove("assigned");
+      const roleName = await resolveRoleName(role);
+      if (badge) {
+        badge.innerText = roleName;
+        if (role !== 0) badge.classList.add("assigned");
+        else badge.classList.remove("assigned");
+      }
+
+      if (currentOfficerProfile && currentOfficerProfile.role) {
+        currentUserRole = currentOfficerProfile.role.toUpperCase();
+      } else if (role === 2 || (roleName && roleName.toUpperCase().includes("LAB"))) {
+        currentUserRole = "FORENSICS";
+      } else if (role === 3 || (roleName && roleName.toUpperCase().includes("COURT"))) {
+        currentUserRole = "COURT";
+      } else {
+        currentUserRole = "POLICE";
+      }
     }
 
-    document.getElementById("adminOnlyDivider").style.display = isCurrentUserAdmin ? "" : "none";
-    document.getElementById("adminOnlyGrid").style.display = isCurrentUserAdmin ? "" : "none";
-    await refreshRoleOptions();
-    await refreshCustomRoleList();
+    setupRoleWorkspace(currentUserRole);
     await loadSafetyStatus();
-    await refreshFaceEnrollStatus();
-  } catch (e) { /* contract not deployed yet at placeholder address */ }
+  } catch (e) {
+    setupRoleWorkspace(currentOfficerProfile?.role || "POLICE");
+  }
 }
 
-// ---------- Stage 5b: Emergency Pause & Admin Transfer ----------
+// ═══════════════════════════════════════════════════════════════════
+// ROLE-BASED WORKSPACE ARCHITECTURE & SIDEBAR CONTROLLER
+// ═══════════════════════════════════════════════════════════════════
+
+function setupRoleWorkspace(role) {
+  currentUserRole = (role || "POLICE").toUpperCase();
+  if (isCurrentUserAdmin) currentUserRole = "ADMIN";
+
+  const avatarEl = document.getElementById("sidebarOfficerAvatar");
+  const nameEl = document.getElementById("sidebarOfficerName");
+  const deptEl = document.getElementById("sidebarOfficerDept");
+  const rolePillEl = document.getElementById("sidebarRolePill");
+  const walletPreviewEl = document.getElementById("sidebarWalletPreview");
+  const menuTitleEl = document.getElementById("sidebarMenuTitle");
+
+  if (currentOfficerProfile) {
+    if (avatarEl && currentOfficerProfile.facePhotoUrl) {
+      avatarEl.src = currentOfficerProfile.facePhotoUrl;
+    }
+    if (nameEl) nameEl.textContent = currentOfficerProfile.officerName || "Authorized Officer";
+    if (deptEl) {
+      const d = currentOfficerProfile.departmentData || {};
+      deptEl.textContent = d.policeStation || d.labId || d.courtName || "Evidex Forensic Network";
+    }
+  } else if (isCurrentUserAdmin) {
+    if (nameEl) nameEl.textContent = "System Administrator";
+    if (deptEl) deptEl.textContent = "State Forensic Headquarters";
+  }
+
+  if (rolePillEl) rolePillEl.textContent = currentUserRole;
+  if (walletPreviewEl && connectedAddress) {
+    walletPreviewEl.textContent = connectedAddress.slice(0, 8) + "..." + connectedAddress.slice(-6);
+  }
+
+  const roleTitles = {
+    POLICE: "Police Operations",
+    FORENSICS: "Forensic Laboratory",
+    COURT: "Judicial Bench",
+    ADMIN: "System Administration"
+  };
+  if (menuTitleEl) menuTitleEl.textContent = roleTitles[currentUserRole] || "Operations";
+
+  renderRoleSidebar(currentUserRole);
+}
+
+function renderRoleSidebar(role) {
+  const nav = document.getElementById("sidebarNavList");
+  if (!nav) return;
+
+  let menuItems = [];
+
+  if (role === "POLICE") {
+    menuItems = [
+      {
+        id: "nav-police-reg",
+        label: "Register Case",
+        panelId: "panel-police-register",
+        title: "Register Case",
+        eyebrow: "Tamil Nadu Police · Evidence Registration",
+        icon: `<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="M9 15h6"/></svg>`
+      },
+      {
+        id: "nav-police-pending",
+        label: "Pending Cases",
+        panelId: "panel-cases-pending",
+        title: "Pending Cases",
+        eyebrow: "Tamil Nadu Police · Active Matters",
+        icon: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`
+      },
+      {
+        id: "nav-police-all",
+        label: "All Cases",
+        panelId: "panel-cases-all",
+        title: "All Cases",
+        eyebrow: "Tamil Nadu Police · Master Directory",
+        icon: `<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>`
+      },
+      {
+        id: "nav-police-verify",
+        label: "Verify Integrity",
+        panelId: "panel-verify",
+        title: "Verify Integrity",
+        eyebrow: "Tamil Nadu Police · Cryptographic Integrity",
+        icon: `<svg viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V5l-8-3z"/><path d="M9 12l2 2 4-4"/></svg>`
+      },
+      {
+        id: "nav-police-transfer",
+        label: "Transfer Custody",
+        panelId: "panel-transfer",
+        title: "Transfer Custody",
+        eyebrow: "Tamil Nadu Police · Custody Handoff",
+        icon: `<svg viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>`
+      }
+    ];
+  } else if (role === "FORENSICS") {
+    menuItems = [
+      {
+        id: "nav-fsl-submit",
+        label: "Submit Report",
+        panelId: "panel-forensics-submit",
+        title: "Submit Forensic Report",
+        eyebrow: "Forensic Sciences Department · Laboratory Findings",
+        icon: `<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`
+      },
+      {
+        id: "nav-fsl-pending",
+        label: "Pending Cases",
+        panelId: "panel-cases-pending",
+        title: "Pending Cases",
+        eyebrow: "Forensic Sciences Department · Pending Lab Requests",
+        icon: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`
+      },
+      {
+        id: "nav-fsl-all",
+        label: "All Cases",
+        panelId: "panel-cases-all",
+        title: "All Cases",
+        eyebrow: "Forensic Sciences Department · Laboratory Repository",
+        icon: `<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>`
+      },
+      {
+        id: "nav-fsl-verify",
+        label: "Verify Integrity",
+        panelId: "panel-verify",
+        title: "Verify Integrity",
+        eyebrow: "Forensic Sciences Department · Hash Verification",
+        icon: `<svg viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V5l-8-3z"/><path d="M9 12l2 2 4-4"/></svg>`
+      },
+      {
+        id: "nav-fsl-transfer",
+        label: "Transfer Custody",
+        panelId: "panel-transfer",
+        title: "Transfer Custody",
+        eyebrow: "Forensic Sciences Department · Custody Handoff",
+        icon: `<svg viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>`
+      }
+    ];
+  } else if (role === "COURT") {
+    // Exact user requirement: 1. Generate Court Report, 2. Pending Cases, 3. All Cases, 4. Custody Trial
+    menuItems = [
+      {
+        id: "nav-court-generate",
+        label: "Generate Court Report",
+        panelId: "panel-court-generate",
+        title: "Generate Court Report",
+        eyebrow: "Judicial Bench · Official Orders & Verdicts",
+        icon: `<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`
+      },
+      {
+        id: "nav-court-pending",
+        label: "Pending Cases",
+        panelId: "panel-cases-pending",
+        title: "Pending Cases",
+        eyebrow: "Judicial Bench · Awaiting Trial & Verdict",
+        icon: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`
+      },
+      {
+        id: "nav-court-all",
+        label: "All Cases",
+        panelId: "panel-cases-all",
+        title: "All Cases",
+        eyebrow: "Judicial Bench · Master Case Docket",
+        icon: `<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>`
+      },
+      {
+        id: "nav-court-trial",
+        label: "Custody Trial",
+        panelId: "panel-court-trial",
+        title: "Custody Trial & Docket",
+        eyebrow: "Judicial Bench · Chain of Custody Audit",
+        icon: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>`
+      }
+    ];
+  } else {
+    // ADMIN: 1. Officer Access Requests (KYC), 2. Admin Transfer, 3. Emergency Pause, 4. User Information
+    menuItems = [
+      {
+        id: "nav-admin-requests",
+        label: "Officer Access Requests (KYC)",
+        panelId: "panel-admin-requests",
+        title: "Officer Access Applications",
+        eyebrow: "State Administration · Departmental Onboarding",
+        icon: `<svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>`
+      },
+      {
+        id: "nav-admin-transfer",
+        label: "Admin Transfer",
+        panelId: "panel-admin-transfer",
+        title: "Admin Handover",
+        eyebrow: "State Administration · Ownership Transfer",
+        icon: `<svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>`
+      },
+      {
+        id: "nav-admin-pause",
+        label: "Emergency Pause",
+        panelId: "panel-admin-pause",
+        title: "Emergency Protocol",
+        eyebrow: "State Administration · Circuit Breaker",
+        icon: `<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`
+      },
+      {
+        id: "nav-admin-users",
+        label: "User Information",
+        panelId: "panel-admin-users",
+        title: "Evidex Personnel Directory",
+        eyebrow: "State Administration · Approved Officer Roster",
+        icon: `<svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`
+      }
+    ];
+  }
+
+  nav.innerHTML = menuItems.map((item, idx) => `
+    <button class="sidebar-nav-btn ${idx === 0 ? 'active' : ''}" id="${item.id}" onclick="switchWorkspacePanel('${item.panelId}', '${item.title}', '${item.eyebrow}', '${item.id}')">
+      ${item.icon}
+      <span>${item.label}</span>
+    </button>
+  `).join("");
+
+  if (menuItems.length > 0) {
+    switchWorkspacePanel(menuItems[0].panelId, menuItems[0].title, menuItems[0].eyebrow, menuItems[0].id);
+  }
+}
+
+function switchWorkspacePanel(panelId, title, eyebrow, btnId) {
+  const titleEl = document.getElementById("workspacePanelTitle");
+  const eyeEl = document.getElementById("workspaceRoleEyebrow");
+  if (titleEl && title) titleEl.textContent = title;
+  if (eyeEl && eyebrow) eyeEl.textContent = eyebrow;
+
+  document.querySelectorAll(".sidebar-nav-btn").forEach(btn => btn.classList.remove("active"));
+  if (btnId) {
+    const btn = document.getElementById(btnId);
+    if (btn) btn.classList.add("active");
+  }
+
+  document.querySelectorAll(".workspace-panel").forEach(p => p.classList.remove("active"));
+  const targetPanel = document.getElementById(panelId);
+  if (targetPanel) {
+    targetPanel.classList.add("active");
+  }
+
+  if (panelId === "panel-cases-pending") {
+    loadRolePendingCases();
+  } else if (panelId === "panel-cases-all") {
+    loadRoleAllCases();
+  } else if (panelId === "panel-admin-users") {
+    loadAdminUsersRoster();
+  } else if (panelId === "panel-admin-requests") {
+    loadAdminPendingCounter();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CASE QUEUES & DOSSIER CONTROLLERS
+// ═══════════════════════════════════════════════════════════════════
+
+async function loadRolePendingCases() {
+  const container = document.getElementById("pendingCasesContainer");
+  if (!container) return;
+  container.innerHTML = `<div style="text-align:center; padding: 40px; color: #94a3b8;">Loading pending cases for ${currentUserRole}...</div>`;
+
+  try {
+    const res = await window.epsApi.getCases(currentUserRole, 'pending');
+    if (!res || !res.success || !res.cases || res.cases.length === 0) {
+      container.innerHTML = `
+        <div style="text-align:center; padding: 48px 20px; background:#ffffff; border:1px solid #e2e8f0; border-radius:16px;">
+          <div style="width:44px; height:44px; border-radius:50%; background:#f1f5f9; display:inline-flex; align-items:center; justify-content:center; color:#64748b; margin-bottom:12px;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div style="font-size:15px; font-weight:700; color:#0f172a;">No Pending Cases</div>
+          <div style="font-size:12.5px; color:#64748b; margin-top:4px;">All cases assigned to your role have been processed.</div>
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = res.cases.map(c => {
+      const fslPill = c.forensics_requested === 1
+        ? (c.forensics_status === 'SUBMITTED' ? '<span class="pill-fsl-submitted">FSL: Report Filed ✓</span>' : '<span class="pill-fsl-pending">FSL: Report Pending</span>')
+        : '<span class="pill-case-closed">FSL: Not Requested</span>';
+      
+      const courtPill = c.court_status === 'CLOSED'
+        ? '<span class="pill-case-closed">Court: Closed</span>'
+        : (c.court_status === 'IN_PROCEEDINGS' ? '<span class="pill-court-pending">Court: In Proceedings</span>' : '<span class="pill-court-pending">Court: Pending</span>');
+
+      const casePill = c.case_status === 'CLOSED' ? '<span class="pill-case-closed">[ CLOSED ]</span>' : '<span class="pill-case-open">[ OPEN ]</span>';
+
+      let roleSpecificBtn = '';
+      if (currentUserRole === 'FORENSICS') {
+        roleSpecificBtn = `<button class="btn-primary" style="padding:7px 12px; font-size:12px;" onclick="prefillForensicReport('${c.case_number}')">Submit Lab Report</button>`;
+      } else if (currentUserRole === 'COURT') {
+        roleSpecificBtn = `<button class="btn-primary" style="padding:7px 12px; font-size:12px;" onclick="prefillCourtReport('${c.case_number}')">Issue Ruling</button>`;
+      }
+
+      return `
+        <div class="case-card-item">
+          <div class="case-card-meta">
+            <div class="case-card-meta-top">
+              <span class="case-number-link" onclick="openCaseDossier('${c.case_number}')">${c.case_number}</span>
+              <span class="case-fir-tag">${c.fir_number || 'FIR N/A'}</span>
+              <div class="case-pills-row">
+                ${casePill}
+                ${fslPill}
+                ${courtPill}
+              </div>
+            </div>
+            <div class="case-card-meta-bottom">
+              <span>🏛️ ${c.police_station || 'Station N/A'}</span>
+              <span>📅 ${new Date(c.created_at).toLocaleDateString()}</span>
+              <span>📁 ${c.evidenceCount || 0} Files Attached</span>
+            </div>
+          </div>
+          <div class="case-actions-group">
+            ${roleSpecificBtn}
+            <button class="btn-view-dossier" onclick="openCaseDossier('${c.case_number}')">
+              View Dossier
+            </button>
+            <button class="btn-zip-download" onclick="downloadCaseZip('${c.case_number}')" title="Download all files in this case as ZIP">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              ZIP
+            </button>
+          </div>
+        </div>
+      `;
+    }).join("");
+  } catch (err) {
+    container.innerHTML = `<div style="color:var(--color-danger); padding:20px; text-align:center;">Failed to load pending cases: ${err.message}</div>`;
+  }
+}
+
+let caseSearchDebounceTimer = null;
+function debounceCaseSearch(val) {
+  clearTimeout(caseSearchDebounceTimer);
+  caseSearchDebounceTimer = setTimeout(() => {
+    loadRoleAllCases(val);
+  }, 250);
+}
+
+async function loadRoleAllCases(search = '') {
+  const container = document.getElementById("allCasesContainer");
+  if (!container) return;
+  container.innerHTML = `<div style="text-align:center; padding: 40px; color: #94a3b8;">Loading cases...</div>`;
+
+  try {
+    const res = await window.epsApi.getCases(currentUserRole, 'all', search);
+    if (!res || !res.success || !res.cases || res.cases.length === 0) {
+      container.innerHTML = `
+        <div style="text-align:center; padding: 48px 20px; background:#ffffff; border:1px solid #e2e8f0; border-radius:16px;">
+          <div style="font-size:15px; font-weight:700; color:#0f172a;">No Cases Found</div>
+          <div style="font-size:12.5px; color:#64748b; margin-top:4px;">${search ? `No cases matching "${search}"` : "No cases registered yet."}</div>
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = res.cases.map(c => {
+      const isClosed = c.case_status === 'CLOSED';
+      const statusPill = isClosed
+        ? '<span class="pill-case-closed">[ CLOSED ]</span>'
+        : '<span class="pill-case-open">[ OPEN ]</span>';
+
+      const fslPill = c.forensics_requested === 1
+        ? (c.forensics_status === 'SUBMITTED' ? '<span class="pill-fsl-submitted">FSL: Submitted</span>' : '<span class="pill-fsl-pending">FSL: Pending</span>')
+        : '<span class="pill-case-closed">FSL: None</span>';
+
+      return `
+        <div class="case-card-item">
+          <div class="case-card-meta">
+            <div class="case-card-meta-top">
+              <span class="case-number-link" onclick="openCaseDossier('${c.case_number}')">${c.case_number}</span>
+              <span class="case-fir-tag">${c.fir_number || 'FIR N/A'}</span>
+              <div class="case-pills-row">
+                ${statusPill}
+                ${fslPill}
+              </div>
+            </div>
+            <div class="case-card-meta-bottom">
+              <span>🏛️ ${c.police_station || 'Station N/A'}</span>
+              <span>👤 ${c.officer_name || 'Investigating Officer'}</span>
+              <span>📅 ${new Date(c.created_at).toLocaleDateString()}</span>
+              <span>📁 ${c.evidenceCount || 0} Files</span>
+            </div>
+          </div>
+          <div class="case-actions-group">
+            <button class="btn-view-dossier" onclick="openCaseDossier('${c.case_number}')">
+              View Dossier
+            </button>
+            <button class="btn-zip-download" onclick="downloadCaseZip('${c.case_number}')" title="Download all files in this case as ZIP">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download ZIP
+            </button>
+          </div>
+        </div>
+      `;
+    }).join("");
+  } catch (err) {
+    container.innerHTML = `<div style="color:var(--color-danger); padding:20px; text-align:center;">Failed to load cases: ${err.message}</div>`;
+  }
+}
+
+async function openCaseDossier(caseNumber) {
+  const modal = document.getElementById("caseDossierModalBackdrop");
+  const title = document.getElementById("dossierModalTitle");
+  const subtitle = document.getElementById("dossierModalSubtitle");
+  const body = document.getElementById("dossierModalBody");
+  const zipBtn = document.getElementById("dossierDownloadZipBtn");
+
+  if (!modal || !body) return;
+  modal.style.display = "flex";
+  title.textContent = `Case Dossier · ${caseNumber}`;
+  body.innerHTML = `<div style="text-align:center; padding:40px; color:#64748b;">Loading case dossier from ledger...</div>`;
+
+  if (zipBtn) {
+    zipBtn.onclick = () => downloadCaseZip(caseNumber);
+  }
+
+  try {
+    const res = await window.epsApi.getCaseDetails(caseNumber);
+    if (!res || !res.success) {
+      body.innerHTML = `<div style="color:var(--color-danger); padding:20px;">Could not load dossier: ${res?.error || 'Unknown error'}</div>`;
+      return;
+    }
+
+    const c = res.case || {};
+    const evidence = res.evidence || [];
+    const forensics = res.forensicReports || [];
+    const court = res.courtReports || [];
+
+    subtitle.textContent = `${c.fir_number || 'FIR N/A'} · ${c.police_station || 'Police Station'} · ${c.law_sections || 'Legal Sections'}`;
+
+    let html = `
+      <div class="dossier-meta-card">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h4 style="margin:0; font-size:15px; color:#0f172a;">Case Information</h4>
+          <div>
+            ${c.case_status === 'CLOSED' ? '<span class="pill-case-closed">[ CLOSED ]</span>' : '<span class="pill-case-open">[ OPEN ]</span>'}
+          </div>
+        </div>
+        <div class="dossier-meta-grid">
+          <div><span style="font-size:11.5px; color:#64748b;">FIR Number</span><div style="font-weight:600;">${c.fir_number || 'N/A'}</div></div>
+          <div><span style="font-size:11.5px; color:#64748b;">Police Station</span><div style="font-weight:600;">${c.police_station || 'N/A'}</div></div>
+          <div><span style="font-size:11.5px; color:#64748b;">Investigating Officer</span><div style="font-weight:600;">${c.officer_name || 'N/A'}</div></div>
+          <div><span style="font-size:11.5px; color:#64748b;">Sections of Law</span><div style="font-weight:600;">${c.law_sections || 'N/A'}</div></div>
+          <div><span style="font-size:11.5px; color:#64748b;">FSL Forensics Status</span><div style="font-weight:600;">${c.forensics_status || 'NOT_REQUIRED'}</div></div>
+          <div><span style="font-size:11.5px; color:#64748b;">Court Status</span><div style="font-weight:600;">${c.court_status || 'PENDING'}</div></div>
+        </div>
+        ${c.description ? `<div style="margin-top:12px; font-size:13px; color:#475569; background:#ffffff; padding:10px 12px; border-radius:8px; border:1px solid #e2e8f0;"><strong>Description:</strong> ${c.description}</div>` : ''}
+      </div>
+
+      <div class="dossier-section-header">
+        <span>Seized Evidence Items (${evidence.length})</span>
+      </div>
+    `;
+
+    if (evidence.length === 0) {
+      html += `<div style="padding:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; font-size:13px; color:#64748b;">No evidence files registered under this case yet.</div>`;
+    } else {
+      html += `
+        <div style="overflow-x:auto;">
+          <table class="admin-roster-table" style="font-size:12.5px;">
+            <thead>
+              <tr>
+                <th>Item ID</th>
+                <th>File Name</th>
+                <th>Size</th>
+                <th>SHA-256 Hash</th>
+                <th>Custodian</th>
+                <th>Filed At</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${evidence.map(e => `
+                <tr>
+                  <td style="font-family:var(--font-mono); font-weight:700;">${e.evidence_id}</td>
+                  <td>${e.file_name || 'evidence_file'}</td>
+                  <td>${e.file_size ? (e.file_size / 1024).toFixed(1) + ' KB' : 'N/A'}</td>
+                  <td style="font-family:var(--font-mono); font-size:11px;" title="${e.file_hash}">${e.file_hash ? e.file_hash.slice(0, 10) + '...' + e.file_hash.slice(-8) : 'N/A'}</td>
+                  <td style="font-family:var(--font-mono); font-size:11px;">${e.current_custodian ? e.current_custodian.slice(0, 6) + '...' + e.current_custodian.slice(-4) : 'N/A'}</td>
+                  <td>${new Date(e.created_at).toLocaleString()}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    html += `
+      <div class="dossier-section-header" style="margin-top:22px;">
+        <span>Forensic Examination Reports (${forensics.length})</span>
+      </div>
+    `;
+
+    if (forensics.length === 0) {
+      html += `<div style="padding:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; font-size:13px; color:#64748b;">No forensic reports submitted for this case.</div>`;
+    } else {
+      html += forensics.map(f => `
+        <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; padding:14px; margin-bottom:10px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <strong style="color:#0f172a; font-size:14px;">${f.report_title}</strong>
+            <span style="font-size:11px; color:#64748b;">${new Date(f.created_at).toLocaleString()}</span>
+          </div>
+          <div style="font-size:12px; color:#475569; margin-bottom:6px;">
+            Examiner: <strong>${f.examiner_name}</strong> · Division: <strong>${f.lab_name}</strong>
+          </div>
+          <div style="font-size:13px; color:#1e293b; background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0; line-height:1.5;">
+            ${f.findings}
+          </div>
+          ${f.file_name ? `<div style="margin-top:8px; font-size:12px; color:#3b82f6;">📎 Attached Certificate: ${f.file_name}</div>` : ''}
+        </div>
+      `).join('');
+    }
+
+    html += `
+      <div class="dossier-section-header" style="margin-top:22px;">
+        <span>Court Orders & Judicial Verdicts (${court.length})</span>
+      </div>
+    `;
+
+    if (court.length === 0) {
+      html += `<div style="padding:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; font-size:13px; color:#64748b;">No judicial rulings recorded for this case.</div>`;
+    } else {
+      html += court.map(crt => `
+        <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; padding:14px; margin-bottom:10px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <strong style="color:#0f172a; font-size:14px;">Verdict: ${crt.verdict}</strong>
+            <span style="font-size:11px; color:#64748b;">${new Date(crt.created_at).toLocaleString()}</span>
+          </div>
+          <div style="font-size:12px; color:#475569; margin-bottom:6px;">
+            Bench: <strong>${crt.court_name}</strong> · Judge: <strong>${crt.judge_name}</strong>
+          </div>
+          <div style="font-size:13px; color:#1e293b; background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0; line-height:1.5;">
+            ${crt.orders_summary}
+          </div>
+          ${crt.file_name ? `<div style="margin-top:8px; font-size:12px; color:#3b82f6;">📎 Signed Order: ${crt.file_name}</div>` : ''}
+        </div>
+      `).join('');
+    }
+
+    body.innerHTML = html;
+  } catch (err) {
+    body.innerHTML = `<div style="color:var(--color-danger); padding:20px;">Failed to load dossier: ${err.message}</div>`;
+  }
+}
+
+function closeCaseDossierModal() {
+  const modal = document.getElementById("caseDossierModalBackdrop");
+  if (modal) modal.style.display = "none";
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// DOWNLOAD ENTIRE CASE AS ZIP
+// ═══════════════════════════════════════════════════════════════════
+
+async function downloadCaseZip(caseNumber) {
+  if (!window.JSZip) {
+    alert("ZIP module loading. Please try again in a moment.");
+    return;
+  }
+
+  try {
+    const res = await window.epsApi.getCaseBundle(caseNumber);
+    if (!res || !res.success) {
+      alert("Could not load case bundle from server: " + (res?.error || "Unknown error"));
+      return;
+    }
+
+    const zip = new JSZip();
+    const caseRec = res.case || {};
+    const evidenceList = res.files?.evidence || [];
+    const forensicList = res.files?.forensicReports || [];
+    const courtList = res.files?.courtReports || [];
+
+    // Master Case Metadata
+    zip.file("CASE_METADATA.json", JSON.stringify({
+      caseNumber: caseRec.case_number,
+      firNumber: caseRec.fir_number,
+      policeStation: caseRec.police_station,
+      lawSections: caseRec.law_sections,
+      description: caseRec.description,
+      registeredBy: caseRec.registered_by,
+      officerName: caseRec.officer_name,
+      forensicsRequested: caseRec.forensics_requested === 1,
+      forensicsStatus: caseRec.forensics_status,
+      courtStatus: caseRec.court_status,
+      caseStatus: caseRec.case_status,
+      createdAt: caseRec.created_at,
+      closedAt: caseRec.closed_at
+    }, null, 2));
+
+    // Section 63 BSA Official Electronic Certificate
+    const certText = `========================================================================
+BHARATIYA SAKSHYA ADHINIYAM (BSA), 2023 - SECTION 63
+OFFICIAL CERTIFICATE FOR ADMISSIBILITY OF ELECTRONIC EVIDENCE
+========================================================================
+CASE NUMBER    : ${caseRec.case_number || caseNumber}
+FIR NUMBER     : ${caseRec.fir_number || 'N/A'}
+POLICE STATION : ${caseRec.police_station || 'N/A'}
+INVESTIGATOR   : ${caseRec.officer_name || 'Authorized Police Officer'}
+STATUS         : ${caseRec.case_status || 'OPEN'}
+LEDGER NETWORK : Ethereum Sepolia (Contract: ${CONTRACT_ADDRESS || 'Evidex'})
+EXPORT DATE    : ${new Date().toISOString()}
+
+EVIDENCE REGISTRATION SCHEDULE:
+${evidenceList.length === 0 ? 'No evidence items recorded yet.' : evidenceList.map((e, idx) => `
+[ITEM ${idx + 1}]
+- Evidence ID : ${e.evidence_id}
+- File Name   : ${e.file_name || 'N/A'}
+- SHA-256 Hash: ${e.file_hash}
+- IPFS CID    : ${e.ipfs_cid || 'N/A'}
+- Custodian   : ${e.current_custodian || e.submitter_address}
+- Recorded At : ${e.created_at}
+`).join('\n')}
+
+FORENSIC EXAMINATION REPORTS:
+${forensicList.length === 0 ? 'No forensic reports submitted.' : forensicList.map((f, idx) => `
+[REPORT ${idx + 1}]
+- Report Title : ${f.report_title}
+- Lab Division : ${f.lab_name}
+- Examiner     : ${f.examiner_name}
+- Findings     : ${f.findings}
+- Report Date  : ${f.created_at}
+`).join('\n')}
+
+COURT ORDERS & JUDICIAL DISPOSITION:
+${courtList.length === 0 ? 'No judicial orders filed.' : courtList.map((c, idx) => `
+[ORDER ${idx + 1}]
+- Court Bench  : ${c.court_name}
+- Judge Name   : ${c.judge_name}
+- Verdict      : ${c.verdict}
+- Directives   : ${c.orders_summary}
+- Filing Date  : ${c.created_at}
+`).join('\n')}
+
+========================================================================
+CERTIFIED IMMUTABLE & VERIFIED AGAINST BLOCKCHAIN MERKLE ROOTS
+Evidex Zero-Trust Cryptographic Forensic Infrastructure
+========================================================================`;
+
+    zip.file("SECTION_63_BSA_CERTIFICATE.txt", certText);
+
+    const eviFolder = zip.folder("01_SEIZED_EVIDENCE");
+    eviFolder.file("EVIDENCE_MANIFEST.json", JSON.stringify(evidenceList, null, 2));
+
+    const fslFolder = zip.folder("02_FORENSIC_LAB_REPORTS");
+    fslFolder.file("FORENSIC_REPORTS.json", JSON.stringify(forensicList, null, 2));
+
+    const courtFolder = zip.folder("03_COURT_ORDERS_AND_VERDICTS");
+    courtFolder.file("COURT_ORDERS.json", JSON.stringify(courtList, null, 2));
+
+    const blob = await zip.generateAsync({ type: "blob" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${caseNumber}_Evidex_Dossier.zip`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 2000);
+  } catch (err) {
+    console.error("ZIP download failed:", err);
+    alert("Failed to build ZIP bundle: " + (err.message || err));
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// FORENSIC REPORT SUBMISSION (LAB)
+// ═══════════════════════════════════════════════════════════════════
+
+async function submitForensicReportAction(btn) {
+  const caseNumber = document.getElementById("forensicCaseNumber").value.trim();
+  const reportTitle = document.getElementById("forensicReportTitle").value.trim();
+  const labName = document.getElementById("forensicLabName").value.trim();
+  const examinerName = document.getElementById("forensicExaminerName").value.trim();
+  const findings = document.getElementById("forensicFindings").value.trim();
+  const fileInput = document.getElementById("forensicFile");
+  const file = fileInput?.files?.[0];
+
+  if (!caseNumber || !reportTitle || !findings) {
+    showResult("forensicSubmitResult", "fail", "Case Number, Report Title, and Findings are required.");
+    return;
+  }
+
+  setBtnBusy(btn, true, "Submitting Report...");
+  showResult("forensicSubmitResult", "pending", "Anchoring forensic examination report to case dossier...");
+
+  try {
+    let fileHash = null;
+    let fileName = null;
+    let fileSize = null;
+    if (file) {
+      fileHash = await hashFile(file);
+      fileName = file.name;
+      fileSize = file.size;
+    }
+
+    const payload = {
+      reportTitle,
+      labName,
+      examinerName,
+      findings,
+      fileName,
+      fileHash,
+      fileSize,
+      submitterAddress: connectedAddress
+    };
+
+    const res = await window.epsApi.submitForensicReport(caseNumber, payload);
+    if (!res || !res.success) {
+      showResult("forensicSubmitResult", "fail", "Failed to submit forensic report: " + (res?.error || "Unknown error"));
+      return;
+    }
+
+    showResult("forensicSubmitResult", "ok", `Forensic Report successfully submitted for ${caseNumber}. Case updated.`);
+    document.getElementById("forensicFindings").value = "";
+    document.getElementById("forensicReportTitle").value = "";
+    if (fileInput) fileInput.value = "";
+    const preview = document.getElementById("forensicFilePreview");
+    if (preview) preview.style.display = "none";
+
+    loadRolePendingCases();
+    loadRoleAllCases();
+  } catch (err) {
+    showResult("forensicSubmitResult", "fail", formatError(err));
+  } finally {
+    setBtnBusy(btn, false);
+  }
+}
+
+function prefillForensicReport(caseNumber) {
+  switchWorkspacePanel('panel-forensics-submit', 'Submit Report', 'State Forensic Science Laboratory');
+  const input = document.getElementById("forensicCaseNumber");
+  if (input) input.value = caseNumber;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// COURT REPORT / RULING GENERATION (COURT)
+// ═══════════════════════════════════════════════════════════════════
+
+async function submitCourtReportAction(btn) {
+  const caseNumber = document.getElementById("courtCaseNumber").value.trim();
+  const courtName = document.getElementById("courtNameInput").value.trim();
+  const judgeName = document.getElementById("courtJudgeNameInput").value.trim();
+  const verdict = document.getElementById("courtVerdictSelect").value;
+  const ordersSummary = document.getElementById("courtOrdersSummary").value.trim();
+  const closeCase = document.getElementById("courtCloseCaseToggle").checked;
+  const fileInput = document.getElementById("courtFile");
+  const file = fileInput?.files?.[0];
+
+  if (!caseNumber || !courtName || !ordersSummary) {
+    showResult("courtSubmitResult", "fail", "Case Number, Court Name, and Orders Summary are required.");
+    return;
+  }
+
+  setBtnBusy(btn, true, "Filing Court Order...");
+  showResult("courtSubmitResult", "pending", "Recording judicial ruling in official court docket...");
+
+  try {
+    let fileHash = null;
+    let fileName = null;
+    let fileSize = null;
+    if (file) {
+      fileHash = await hashFile(file);
+      fileName = file.name;
+      fileSize = file.size;
+    }
+
+    const payload = {
+      courtName,
+      judgeName,
+      verdict,
+      ordersSummary,
+      fileName,
+      fileHash,
+      fileSize,
+      submitterAddress: connectedAddress,
+      closeCase
+    };
+
+    const res = await window.epsApi.submitCourtReport(caseNumber, payload);
+    if (!res || !res.success) {
+      showResult("courtSubmitResult", "fail", "Failed to file court report: " + (res?.error || "Unknown error"));
+      return;
+    }
+
+    showResult("courtSubmitResult", "ok", res.message || `Court ruling successfully recorded for ${caseNumber}.`);
+    document.getElementById("courtOrdersSummary").value = "";
+    if (fileInput) fileInput.value = "";
+    const preview = document.getElementById("courtFilePreview");
+    if (preview) preview.style.display = "none";
+
+    loadRolePendingCases();
+    loadRoleAllCases();
+  } catch (err) {
+    showResult("courtSubmitResult", "fail", formatError(err));
+  } finally {
+    setBtnBusy(btn, false);
+  }
+}
+
+function handleVerdictChange(verdict) {
+  const toggle = document.getElementById("courtCloseCaseToggle");
+  if (toggle) {
+    toggle.checked = ['CONVICTION', 'ACQUITTAL', 'CLOSED', 'CASE_DISMISSED'].includes(verdict);
+  }
+}
+
+function prefillCourtReport(caseNumber) {
+  switchWorkspacePanel('panel-court-generate', 'Generate Court Report', 'Judicial Court of Law');
+  const input = document.getElementById("courtCaseNumber");
+  if (input) input.value = caseNumber;
+}
+
+function generateCourtPdfCertificate() {
+  const caseNumber = document.getElementById("courtCaseNumber")?.value.trim();
+  if (!caseNumber) {
+    alert("Please enter a Case Number first.");
+    return;
+  }
+  const btn = document.getElementById("courtReportBtn");
+  if (document.getElementById("caseBundleCaseNumber")) {
+    document.getElementById("caseBundleCaseNumber").value = caseNumber;
+  }
+  generateCourtReport(btn);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ADMIN USER INFORMATION ROSTER
+// ═══════════════════════════════════════════════════════════════════
+
+async function loadAdminUsersRoster() {
+  const container = document.getElementById("adminUsersTableContainer");
+  if (!container) return;
+  container.innerHTML = `<div style="text-align:center; padding:40px; color:#94a3b8;">Loading personnel roster...</div>`;
+
+  try {
+    const res = await window.epsApi.getAdminUsers();
+    if (!res || !res.success || !res.users || res.users.length === 0) {
+      container.innerHTML = `
+        <div style="text-align:center; padding:40px; color:#64748b;">
+          No approved officers registered in system directory.
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <table class="admin-roster-table">
+        <thead>
+          <tr>
+            <th>Photo</th>
+            <th>Officer Name</th>
+            <th>Service Role</th>
+            <th>Station / Laboratory / Court</th>
+            <th>Badge / ID</th>
+            <th>Contact</th>
+            <th>Aadhaar Verification</th>
+            <th>Authorized At</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${res.users.map(u => {
+            const dept = u.departmentData || {};
+            const unit = dept.policeStation || dept.labId || dept.courtName || dept.district || 'Official Dept';
+            const badge = dept.badgeNumber || dept.accreditationNumber || dept.benchId || 'N/A';
+            const photoSrc = u.facePhotoUrl || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2364748b'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
+
+            return `
+              <tr>
+                <td>
+                  <img src="${photoSrc}" class="roster-thumb" alt="${u.officerName}" />
+                </td>
+                <td>
+                  <strong style="color:#0f172a;">${u.officerName}</strong>
+                  <div style="font-family:var(--font-mono); font-size:10.5px; color:#64748b;">${u.walletAddress ? u.walletAddress.slice(0, 6) + '...' + u.walletAddress.slice(-4) : ''}</div>
+                </td>
+                <td><span class="role-pill-badge">${u.role}</span></td>
+                <td>${unit}</td>
+                <td style="font-family:var(--font-mono);">${badge}</td>
+                <td>
+                  <div>${u.mobile || 'N/A'}</div>
+                  <div style="font-size:11px; color:#64748b;">${u.email || ''}</div>
+                </td>
+                <td><span class="uidai-verified-pill">✓ UIDAI Verified</span></td>
+                <td style="font-size:12px; color:#64748b;">${u.updatedAt ? new Date(u.updatedAt).toLocaleDateString() : 'N/A'}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+  } catch (err) {
+    container.innerHTML = `<div style="color:var(--color-danger); padding:20px;">Failed to load roster: ${err.message}</div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ADMIN CONTROLS (WITHOUT FACE VERIFICATION FLUFF)
+// ═══════════════════════════════════════════════════════════════════
+
 async function loadSafetyStatus() {
   try {
     const isPaused = await contract.paused();
-    document.getElementById("pauseStatus").innerText = isPaused
-      ? "🔴 Contract is currently PAUSED — writes are blocked"
-      : "🟢 Contract is active — normal operation";
-    document.getElementById("pauseBtn").style.display = isPaused ? "none" : "";
-    document.getElementById("unpauseBtn").style.display = isPaused ? "" : "none";
+    const pauseEl = document.getElementById("pauseStatus");
+    if (pauseEl) {
+      pauseEl.innerText = isPaused
+        ? "🔴 Contract is currently PAUSED — writes are blocked"
+        : "🟢 Contract is active — normal operation";
+    }
+    const pauseBtn = document.getElementById("pauseBtn");
+    const unpauseBtn = document.getElementById("unpauseBtn");
+    if (pauseBtn) pauseBtn.style.display = isPaused ? "none" : "";
+    if (unpauseBtn) unpauseBtn.style.display = isPaused ? "" : "none";
 
     const pending = await contract.pendingAdmin();
     const zero = "0x0000000000000000000000000000000000000000";
+    const statusEl = document.getElementById("pendingAdminStatus");
+    const acceptBtn = document.getElementById("acceptAdminBtn");
+    const cancelBtn = document.getElementById("cancelAdminBtn");
+
     if (pending.toLowerCase() === zero) {
-      document.getElementById("pendingAdminStatus").innerText = "No admin transfer pending.";
-      document.getElementById("acceptAdminBtn").style.display = "none";
-      document.getElementById("cancelAdminBtn").style.display = "none";
+      if (statusEl) statusEl.innerText = "No admin transfer pending.";
+      if (acceptBtn) acceptBtn.style.display = "none";
+      if (cancelBtn) cancelBtn.style.display = "none";
     } else {
-      document.getElementById("pendingAdminStatus").innerText = "Pending admin (awaiting acceptance): " + pending;
-      document.getElementById("cancelAdminBtn").style.display = isCurrentUserAdmin ? "" : "none";
-      document.getElementById("acceptAdminBtn").style.display =
-        connectedAddress && connectedAddress.toLowerCase() === pending.toLowerCase() ? "" : "none";
+      if (statusEl) statusEl.innerText = "Pending admin (awaiting acceptance): " + pending;
+      if (cancelBtn) cancelBtn.style.display = isCurrentUserAdmin ? "" : "none";
+      if (acceptBtn) {
+        acceptBtn.style.display =
+          connectedAddress && connectedAddress.toLowerCase() === pending.toLowerCase() ? "" : "none";
+      }
     }
-  } catch (e) { /* view calls only work once contract is deployed & reachable */ }
+  } catch (e) {}
 }
 
 async function pauseContract() {
-  const verified = await verifyFaceBeforeAction("Pause Contract");
-  if (!verified) return;
+  if (!confirm("Are you sure you want to PAUSE the smart contract? All evidence registrations and transfers will be temporarily halted.")) return;
   try {
-    showResult("pauseResult", "pending", "Submitting transaction...");
+    showResult("pauseResult", "pending", "Submitting pause transaction...");
     const tx = await contract.pause();
     await tx.wait();
     if (window.epsApi) {
       window.epsApi.logAudit("CONTRACT_PAUSED", connectedAddress, { txHash: tx.hash });
     }
-    showResult("pauseResult", "ok", "Contract paused.");
+    showResult("pauseResult", "ok", "Contract PAUSED successfully.");
     loadSafetyStatus();
   } catch (err) {
     showResult("pauseResult", "fail", formatError(err));
@@ -1159,16 +2079,15 @@ async function pauseContract() {
 }
 
 async function unpauseContract() {
-  const verified = await verifyFaceBeforeAction("Unpause Contract");
-  if (!verified) return;
+  if (!confirm("Are you sure you want to UNPAUSE the smart contract? Normal operations will resume.")) return;
   try {
-    showResult("pauseResult", "pending", "Submitting transaction...");
+    showResult("pauseResult", "pending", "Submitting unpause transaction...");
     const tx = await contract.unpause();
     await tx.wait();
     if (window.epsApi) {
       window.epsApi.logAudit("CONTRACT_UNPAUSED", connectedAddress, { txHash: tx.hash });
     }
-    showResult("pauseResult", "ok", "Contract unpaused.");
+    showResult("pauseResult", "ok", "Contract UNPAUSED successfully.");
     loadSafetyStatus();
   } catch (err) {
     showResult("pauseResult", "fail", formatError(err));
@@ -1177,8 +2096,11 @@ async function unpauseContract() {
 
 async function proposeAdminAction() {
   const addr = document.getElementById("proposeAdminAddress").value.trim();
-  const verified = await verifyFaceBeforeAction("Propose New Admin");
-  if (!verified) return;
+  if (!addr || !ethers.utils.isAddress(addr)) {
+    showResult("adminTransferResult", "fail", "Enter a valid Ethereum address.");
+    return;
+  }
+  if (!confirm(`Propose ${addr} as new contract admin?`)) return;
   try {
     showResult("adminTransferResult", "pending", "Submitting transaction...");
     const tx = await contract.proposeAdmin(addr);
@@ -1191,8 +2113,7 @@ async function proposeAdminAction() {
 }
 
 async function acceptAdminAction() {
-  const verified = await verifyFaceBeforeAction("Accept Admin Role");
-  if (!verified) return;
+  if (!confirm("Accept System Administrator ownership?")) return;
   try {
     showResult("adminTransferResult", "pending", "Submitting transaction...");
     const tx = await contract.acceptAdmin();
@@ -1224,11 +2145,27 @@ async function loadStats() {
     countUp("statEvidence", total.toNumber());
     countUp("statTransfers", transfers.toNumber());
     countUp("statVerified", passes.toNumber());
-  } catch (e) { /* ignore until connected + deployed */ }
+    countUp("wStatVerified", passes.toNumber());
+    countUp("wStatCases", total.toNumber());
+  } catch (e) {}
+
+  if (window.epsApi) {
+    try {
+      const casesRes = await window.epsApi.getCases(currentUserRole, 'all');
+      if (casesRes && casesRes.success) {
+        countUp("wStatCases", casesRes.count || 0);
+      }
+      const pendingRes = await window.epsApi.getCases(currentUserRole, 'pending');
+      if (pendingRes && pendingRes.success) {
+        countUp("wStatPending", pendingRes.count || 0);
+      }
+    } catch (e) {}
+  }
 }
 
 function countUp(elId, target) {
   const el = document.getElementById(elId);
+  if (!el) return;
   let current = 0;
   const step = Math.max(1, Math.ceil(target / 30));
   const interval = setInterval(() => {
@@ -2310,7 +3247,26 @@ async function registerEvidence(btn) {
 
     cacheCaseKeyLocally(caseNumber, caseKey);
 
+    const forensicsRequested = document.getElementById("regForensicsRequested")?.checked ? 1 : 0;
     if (window.epsApi) {
+      if (typeof window.epsApi.registerCase === "function") {
+        try {
+          await window.epsApi.registerCase({
+            caseNumber,
+            firNumber,
+            policeStation,
+            lawSections,
+            description,
+            registeredBy: connectedAddress,
+            officerName: currentOfficerProfile?.officerName || "Investigating Officer",
+            caseKey,
+            forensicsRequested
+          });
+        } catch (caseErr) {
+          console.warn("Could not register case metadata with backend:", caseErr);
+        }
+      }
+
       for (let i = 0; i < evidenceIds.length; i++) {
         window.epsApi.indexEvidence({
           id: evidenceIds[i],
@@ -2342,6 +3298,8 @@ async function registerEvidence(btn) {
       `<br><br><strong>Case Encryption Key:</strong><br>${caseKey}<br><span style="color:var(--ink-500);">Any role holder can now retrieve this automatically from the Case Evidence List — no need to note it down.</span>`
     );
     loadStats();
+    if (typeof loadRolePendingCases === "function") loadRolePendingCases();
+    if (typeof loadRoleAllCases === "function") loadRoleAllCases();
   } catch (err) {
     if (uploadAnim) uploadAnim.destroy();
     showResult("regResult", "fail", formatError(err));
