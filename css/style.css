@@ -149,7 +149,8 @@ body::after {
    ULTRA-TRANSLUCENT FROSTED FLOATING HEADER (PIXEL-MATCHED TO REFERENCE)
    ═══════════════════════════════════════════════════════════════════ */
 
-nav {
+nav.site-top-bar,
+nav#topNavBar {
   position: absolute;
   top: 24px;
   left: 50%;
@@ -2409,7 +2410,8 @@ footer {
 }
 
 @media (max-width: 768px) {
-  nav {
+  nav.site-top-bar,
+  nav#topNavBar {
     top: 12px;
     width: 96vw;
   }
@@ -3076,106 +3078,134 @@ footer {
   margin: 0 auto;
 }
 
-/* Translucent Frosted Glass Left Sidebar (Matching Header Top Bar) */
+/* ═══════════════════════════════════════════════════════════════════
+   TRANSLUCENT SQUARE ROLE OPTIONS BOX (MATCHING TOP BAR FROSTED GLASS)
+   ═══════════════════════════════════════════════════════════════════ */
+
+.role-options-box,
 .role-sidebar {
-  width: 290px;
-  min-width: 290px;
-  background: rgba(255, 255, 255, 0.52);
+  width: 275px;
+  min-width: 275px;
+  background: rgba(255, 255, 255, 0.65);
   backdrop-filter: blur(28px) saturate(1.8);
   -webkit-backdrop-filter: blur(28px) saturate(1.8);
-  border: 1px solid rgba(255, 255, 255, 0.88);
-  border-radius: 24px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.04), 0 0 0 0.5px rgba(208, 214, 215, 0.5) inset;
-  padding: 22px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 22px;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.04), 0 0 0 0.5px rgba(208, 214, 215, 0.5) inset;
+  padding: 18px 16px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
   position: sticky;
   top: 96px;
   z-index: 100;
+  box-sizing: border-box;
 }
 
-/* Sidebar Officer Profile Card */
-.sidebar-officer-card {
+/* Header inside the square box */
+.role-box-header {
   display: flex;
-  align-items: center;
-  gap: 14px;
-  padding-bottom: 18px;
+  flex-direction: column;
+  gap: 5px;
+  padding-bottom: 12px;
   border-bottom: 1px solid rgba(226, 232, 240, 0.8);
 }
 
-.officer-avatar-box {
-  width: 52px;
-  height: 62px;
-  border-radius: 12px;
-  overflow: hidden;
-  background: #f1f5f9;
-  border: 1.5px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  flex-shrink: 0;
-}
-
-.officer-avatar-box img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.officer-info-box {
-  min-width: 0;
-  flex: 1;
-}
-
-.officer-info-box .officer-name {
-  font-size: 14.5px;
-  font-weight: 700;
-  color: #0f172a;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.officer-info-box .officer-dept {
-  font-size: 11.5px;
-  color: #64748b;
-  margin-top: 1px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.officer-badges {
+.role-box-top-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 6px;
-  flex-wrap: wrap;
+  justify-content: space-between;
 }
 
 .role-pill-badge {
   background: #0f172a;
   color: #ffffff;
-  font-size: 9.5px;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 2px 8px;
+  letter-spacing: 0.6px;
+  padding: 3px 9px;
   border-radius: 9999px;
 }
 
-.uidai-verified-pill {
-  background: #ecfdf5;
-  color: #059669;
-  border: 1px solid #a7f3d0;
-  font-size: 9.5px;
+.testing-mode-pill {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+  font-size: 10px;
   font-weight: 700;
   padding: 2px 7px;
   border-radius: 9999px;
 }
 
-/* Sidebar Section Title */
-.sidebar-section-title {
+.role-box-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.role-box-subtitle {
+  font-size: 11.5px;
+  color: #64748b;
+}
+
+/* Test Role Switcher in Square Box (Enables Unregistered Testing) */
+.test-role-switcher-box {
+  background: rgba(241, 245, 249, 0.7);
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  border-radius: 14px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.test-switcher-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #475569;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.test-pills-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.test-pill-btn {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #334155;
   font-size: 11px;
+  font-weight: 600;
+  padding: 6px 4px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.test-pill-btn:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.test-pill-btn.active {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.2);
+}
+
+.sidebar-section-title {
+  font-size: 10.5px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.8px;
@@ -3183,35 +3213,37 @@ footer {
   padding: 0 4px;
 }
 
-/* Sidebar Navigation Items */
+/* Sidebar Navigation Items in the Square Box */
 .sidebar-nav-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  width: 100%;
 }
 
 .sidebar-nav-btn {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 11px 14px;
+  gap: 10px;
+  padding: 10px 12px;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 14px;
+  border-radius: 12px;
   color: #475569;
   font-family: var(--font-sans);
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   text-align: left;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   width: 100%;
   position: relative;
+  box-sizing: border-box;
 }
 
 .sidebar-nav-btn svg {
-  width: 17px;
-  height: 17px;
+  width: 16px;
+  height: 16px;
   stroke: currentColor;
   stroke-width: 2;
   fill: none;
@@ -3220,9 +3252,9 @@ footer {
 }
 
 .sidebar-nav-btn:hover {
-  background: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.85);
   color: #0f172a;
-  border-color: rgba(226, 232, 240, 0.8);
+  border-color: rgba(226, 232, 240, 0.9);
   transform: translateX(2px);
 }
 
@@ -3230,16 +3262,16 @@ footer {
   background: #ffffff;
   color: #0f172a;
   font-weight: 700;
-  border-color: rgba(203, 213, 225, 0.9);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(15, 23, 42, 0.05);
+  border-color: rgba(203, 213, 225, 0.95);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
 }
 
 .sidebar-nav-btn.active::before {
   content: "";
   position: absolute;
   left: 0;
-  top: 8px;
-  bottom: 8px;
+  top: 6px;
+  bottom: 6px;
   width: 3.5px;
   background: #0f172a;
   border-radius: 0 4px 4px 0;
@@ -3249,54 +3281,46 @@ footer {
   stroke: #0f172a;
 }
 
-.sidebar-nav-count {
-  margin-left: auto;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 7px;
-  border-radius: 9999px;
-  background: #f1f5f9;
-  color: #64748b;
-}
-
-.sidebar-nav-btn.active .sidebar-nav-count {
-  background: #0f172a;
-  color: #ffffff;
-}
-
-/* Sidebar Footer Status Card */
-.sidebar-status-card {
-  margin-top: auto;
+/* Sidebar Connected Wallet Preview */
+.sidebar-wallet-card {
+  margin-top: 4px;
+  padding: 9px 12px;
   background: rgba(255, 255, 255, 0.5);
   border: 1px solid rgba(226, 232, 240, 0.8);
-  border-radius: 14px;
-  padding: 12px;
-}
-
-.sidebar-status-card .status-row {
+  border-radius: 12px;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+}
+
+.wallet-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+  flex-shrink: 0;
+}
+
+.wallet-text-col {
+  min-width: 0;
+  flex: 1;
+}
+
+.wallet-addr-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
   font-weight: 600;
   color: #334155;
-}
-
-.sidebar-status-card .status-chain {
-  margin-left: auto;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: #64748b;
-}
-
-.sidebar-status-card .wallet-addr-preview {
-  margin-top: 6px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: #94a3b8;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.wallet-role-sub {
+  font-size: 9.5px;
+  color: #64748b;
+  margin-top: 1px;
 }
 
 /* ── Workspace Main Content Area ── */

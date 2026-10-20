@@ -17,7 +17,7 @@
 </head>
 <body>
 
-<nav>
+<nav class="site-top-bar" id="topNavBar">
   <div class="nav-inner">
     <div class="brand">
       <div class="brand-mark flame-vortex-logo" title="Evidex">
@@ -143,41 +143,49 @@
 <main id="appContent" style="display: none; opacity: 0; transition: opacity 0.5s ease;">
   <div class="wrap app-workspace-layout">
     
-    <!-- LEFT TRANSLUCENT ROLE SIDEBAR -->
-    <aside class="role-sidebar" id="roleSidebar">
-      <!-- Officer Profile Identity Card -->
-      <div class="sidebar-officer-card">
-        <div class="officer-avatar-box">
-          <img id="sidebarOfficerAvatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2364748b'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E" alt="Officer Avatar" />
+    <!-- LEFT TRANSLUCENT SQUARE ROLE OPTIONS BOX (MATCHING TOP BAR FROSTED GLASS) -->
+    <aside class="role-options-box" id="roleSidebar">
+      <!-- Role Title & Identity Header -->
+      <div class="role-box-header">
+        <div class="role-box-top-row">
+          <span class="role-pill-badge" id="sidebarRolePill">POLICE</span>
+          <span class="testing-mode-pill">🧪 Test Mode</span>
         </div>
-        <div class="officer-info-box">
-          <div class="officer-name" id="sidebarOfficerName">Authorized Officer</div>
-          <div class="officer-dept" id="sidebarOfficerDept">Tamil Nadu Police</div>
-          <div class="officer-badges">
-            <span class="role-pill-badge" id="sidebarRolePill">POLICE</span>
-            <span class="uidai-verified-pill" id="sidebarUidaiPill">✓ UIDAI Verified</span>
-          </div>
+        <div class="role-box-title" id="sidebarMenuTitle">Police Operations</div>
+        <div class="role-box-subtitle" id="sidebarOfficerDept">Tamil Nadu Police</div>
+      </div>
+
+      <!-- Testing Role Switcher: Enables unregistered wallet testing & role identification -->
+      <div class="test-role-switcher-box">
+        <div class="test-switcher-title">
+          <span>Testing Role:</span>
+          <span style="font-size:9.5px; color:#10b981; font-weight:700;">Unregistered Allowed</span>
+        </div>
+        <div class="test-pills-grid">
+          <button class="test-pill-btn active" id="pill-test-POLICE" onclick="setTestingRole('POLICE')">👮 Investigator</button>
+          <button class="test-pill-btn" id="pill-test-FORENSICS" onclick="setTestingRole('FORENSICS')">🔬 Lab</button>
+          <button class="test-pill-btn" id="pill-test-COURT" onclick="setTestingRole('COURT')">⚖️ Court</button>
+          <button class="test-pill-btn" id="pill-test-ADMIN" onclick="setTestingRole('ADMIN')">🛡️ Admin</button>
         </div>
       </div>
 
       <!-- Navigation Section Label -->
       <div class="sidebar-section-title">
-        <span id="sidebarMenuTitle">Operations</span>
+        <span>Options</span>
       </div>
 
-      <!-- Role-Specific Navigation Buttons -->
-      <nav class="sidebar-nav-list" id="sidebarNavList">
+      <!-- Role-Specific Navigation Buttons (Square Box) -->
+      <div class="sidebar-nav-list" id="sidebarNavList">
         <!-- Injected dynamically by renderRoleSidebar() in app.js -->
-      </nav>
+      </div>
 
-      <!-- Sidebar Status -->
-      <div class="sidebar-status-card">
-        <div class="status-row">
-          <span class="dot live"></span>
-          <span class="status-text">Ledger Online</span>
-          <span class="status-chain" id="sidebarChainLabel">Sepolia</span>
+      <!-- Connected Wallet Status -->
+      <div class="sidebar-wallet-card">
+        <div class="wallet-status-dot"></div>
+        <div class="wallet-text-col">
+          <div class="wallet-addr-label" id="sidebarWalletPreview">0x...</div>
+          <div class="wallet-role-sub" id="sidebarWalletRoleSub">Full Testing Access</div>
         </div>
-        <div class="wallet-addr-preview" id="sidebarWalletPreview">0x...</div>
       </div>
     </aside>
 
