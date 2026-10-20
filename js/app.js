@@ -1195,20 +1195,11 @@ function setupRoleWorkspace(role) {
 
   const deptEl = document.getElementById("sidebarOfficerDept");
   const rolePillEl = document.getElementById("sidebarRolePill");
-  const walletPreviewEl = document.getElementById("sidebarWalletPreview");
   const menuTitleEl = document.getElementById("sidebarMenuTitle");
-  const walletRoleSubEl = document.getElementById("sidebarWalletRoleSub");
 
   if (rolePillEl) rolePillEl.textContent = currentUserRole;
-  if (walletPreviewEl && connectedAddress) {
-    walletPreviewEl.textContent = connectedAddress.slice(0, 8) + "..." + connectedAddress.slice(-6);
-  }
-
   if (menuTitleEl) menuTitleEl.textContent = authEntry?.title || "Operations";
   if (deptEl) deptEl.textContent = authEntry?.dept || "Evidex Network";
-  if (walletRoleSubEl) {
-    walletRoleSubEl.textContent = `Authorized · ${currentUserRole}`;
-  }
 
   renderRoleSidebar(currentUserRole);
 }
