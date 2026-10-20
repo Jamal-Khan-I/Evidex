@@ -3798,10 +3798,17 @@ async function openRegisterModal() {
   if (webcam) webcam.style.display = "block";
 
   const guideOval = document.getElementById("regGuideOval");
-  if (guideOval) guideOval.style.display = "block";
+  if (guideOval) guideOval.style.display = "flex";
 
   const liveBadge = document.getElementById("regLiveBadge");
   if (liveBadge) liveBadge.style.display = "flex";
+
+  const zoomBar = document.getElementById("regZoomBar");
+  if (zoomBar) zoomBar.style.display = "flex";
+
+  const zoomSlider = document.getElementById("regZoomSlider");
+  if (zoomSlider) zoomSlider.value = "1.6";
+  updateWebcamZoom(1.6);
 
   const capBtn = document.getElementById("regCaptureBtn");
   if (capBtn) capBtn.style.display = "block";
@@ -3846,7 +3853,18 @@ function closeRegisterModal() {
   }
 }
 
-function capturePassportPhoto() {
+function updateWebcamZoom(val) {
+  const video = document.getElementById("regWebcam");
+  const zoomLabel = document.getElementById("regZoomVal");
+  const zoom = parseFloat(val) || 1.6;
+  if (zoomLabel) zoomLabel.innerText = zoom.toFixed(1) + "x";
+  if (video) {
+    video.style.transform = `scale(${zoom})`;
+    video.style.transformOrigin = "50% 38%";
+  }
+}
+
+async function capturePassportPhoto() {
   const video = document.getElementById("regWebcam");
   const canvas = document.getElementById("regCanvas");
   const preview = document.getElementById("regPhotoPreview");
@@ -3854,23 +3872,116 @@ function capturePassportPhoto() {
   const liveBadge = document.getElementById("regLiveBadge");
   const capBtn = document.getElementById("regCaptureBtn");
   const retakeBtn = document.getElementById("regRetakeBtn");
+  const zoomBar = document.getElementById("regZoomBar");
 
   if (!video || !canvas || !preview) return;
 
-  const w = video.videoWidth || 480;
-  const h = video.videoHeight || 640;
-  canvas.width = w;
-  canvas.height = h;
+  const vw = video.videoWidth || 640;
+  const vh = video.videoHeight || 480;
+  if (!vw || !vh) return;
 
+  // Final passport photo output size: 480x640 (clean 3:4 portrait standard)
+  const targetW = 480;
+  const targetH = 640;
+  canvas.width = targetW;
+  canvas.height = targetH;
   const ctx = canvas.getContext("2d");
-  ctx.drawImage(video, 0, 0, w, h);
 
-  capturedPassportPhotoBase64 = canvas.toDataURL("image/jpeg", 0.92);
+  // Current digital zoom level chosen by user (default 1.6x for face close-up)
+  const zoom = parseFloat(document.getElementById("regZoomSlider")?.value || "1.6") || 1.6;
+
+  let faceCrop = null;
+
+  // 1. Try Native Browser FaceDetector API (available in modern Chromium/Edge/Chrome)
+  if ('FaceDetector' in window) {
+    try {
+      const detector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
+      const detectedFaces = await detector.detect(video);
+      if (detectedFaces && detectedFaces.length > 0) {
+        const box = detectedFaces[0].boundingBox;
+        const faceCenterX = box.x + box.width / 2;
+        const faceCenterY = box.y + box.height / 2;
+
+        // In standard passport photos, the face occupies ~65% of the frame height
+        const cropHeight = box.height / 0.65;
+        const cropWidth = cropHeight * (3 / 4); // 3:4 aspect ratio
+
+        let sx = faceCenterX - cropWidth / 2;
+        let sy = faceCenterY - cropHeight * 0.42;
+
+        sx = Math.max(0, Math.min(vw - cropWidth, sx));
+        sy = Math.max(0, Math.min(vh - cropHeight, sy));
+        const sw = Math.min(cropWidth, vw - sx);
+        const sh = Math.min(cropHeight, vh - sy);
+
+        if (sw > 40 && sh > 40) {
+          faceCrop = { sx, sy, sw, sh };
+        }
+      }
+    } catch (e) {
+      console.warn("Native FaceDetector fallback:", e);
+    }
+  }
+
+  // 2. Fallback: Precise Focal Crop matching on-screen oval guide & zoom
+  // Completely eliminates body, chest, arms, and room background
+  if (!faceCrop) {
+    const videoAspect = vw / vh;
+    const viewportAspect = 240 / 320; // 0.75
+
+    let visW, visH, offX, offY;
+    if (videoAspect > viewportAspect) {
+      // Landscape video cropped on left & right
+      visH = vh;
+      visW = vh * viewportAspect;
+      offX = (vw - visW) / 2;
+      offY = 0;
+    } else {
+      // Portrait or square video cropped top & bottom
+      visW = vw;
+      visH = vw / viewportAspect;
+      offX = 0;
+      offY = (vh - visH) / 2;
+    }
+
+    // Apply digital zoom
+    const zoomedW = visW / zoom;
+    const zoomedH = visH / zoom;
+    const zoomCenterX = offX + visW * 0.50;
+    const zoomCenterY = offY + visH * 0.38; // head/face center
+
+    const zoomedX = Math.max(0, zoomCenterX - zoomedW * 0.50);
+    const zoomedY = Math.max(0, zoomCenterY - zoomedH * 0.38);
+
+    // Oval area inside viewport (76% width, 72% height)
+    const ovalW = zoomedW * 0.76;
+    const ovalH = ovalW * (4 / 3); // exact 3:4 passport ratio
+
+    let sx = Math.max(0, zoomedX + (zoomedW - ovalW) / 2);
+    let sy = Math.max(0, zoomedY + (zoomedH - ovalH) * 0.32);
+    let sw = Math.min(ovalW, vw - sx);
+    let sh = Math.min(ovalH, vh - sy);
+
+    faceCrop = { sx, sy, sw, sh };
+  }
+
+  // Clear canvas & render crisp face-alone crop
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, targetW, targetH);
+
+  ctx.drawImage(
+    video,
+    faceCrop.sx, faceCrop.sy, faceCrop.sw, faceCrop.sh,
+    0, 0, targetW, targetH
+  );
+
+  capturedPassportPhotoBase64 = canvas.toDataURL("image/jpeg", 0.95);
   preview.src = capturedPassportPhotoBase64;
   preview.style.display = "block";
   video.style.display = "none";
   if (guideOval) guideOval.style.display = "none";
   if (liveBadge) liveBadge.style.display = "none";
+  if (zoomBar) zoomBar.style.display = "none";
 
   if (capBtn) capBtn.style.display = "none";
   if (retakeBtn) retakeBtn.style.display = "block";
@@ -3886,17 +3997,22 @@ function retakePassportPhoto() {
   const liveBadge = document.getElementById("regLiveBadge");
   const capBtn = document.getElementById("regCaptureBtn");
   const retakeBtn = document.getElementById("regRetakeBtn");
+  const zoomBar = document.getElementById("regZoomBar");
 
   if (preview) {
     preview.src = "";
     preview.style.display = "none";
   }
   if (video) video.style.display = "block";
-  if (guideOval) guideOval.style.display = "block";
+  if (guideOval) guideOval.style.display = "flex";
   if (liveBadge) liveBadge.style.display = "flex";
+  if (zoomBar) zoomBar.style.display = "flex";
 
   if (capBtn) capBtn.style.display = "block";
   if (retakeBtn) retakeBtn.style.display = "none";
+
+  const zoomSlider = document.getElementById("regZoomSlider");
+  updateWebcamZoom(zoomSlider ? zoomSlider.value : 1.6);
 
   validateRegistrationForm();
 }

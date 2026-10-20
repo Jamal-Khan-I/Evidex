@@ -589,23 +589,35 @@
         <!-- LEFT: Live Webcam Face Capture -->
         <div class="webcam-panel">
           <div style="font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 4px;">Live Face Capture</div>
-          <div style="font-size: 11.5px; color: #64748b; margin-bottom: 12px; text-align: center;">Official Passport Frame (3:4 ratio)</div>
+          <div style="font-size: 11.5px; color: #64748b; margin-bottom: 12px; text-align: center;">Official Passport Framing (Face Alone)</div>
           
           <div class="webcam-viewport" id="regWebcamViewport">
             <video id="regWebcam" autoplay playsinline muted></video>
             <canvas id="regCanvas"></canvas>
-            <img id="regPhotoPreview" class="webcam-preview-img" alt="Captured Passport Photo" />
-            <div class="passport-guide-oval" id="regGuideOval"></div>
+            <img id="regPhotoPreview" class="webcam-preview-img" alt="Captured Face Photo" />
+            <div class="passport-guide-oval" id="regGuideOval">
+              <span class="guide-oval-label">ALIGN FACE HERE</span>
+            </div>
             <div class="live-indicator-badge" id="regLiveBadge">
               <span class="dot"></span>
               <span>LIVE</span>
             </div>
           </div>
 
+          <!-- Digital Face Framing Zoom Control -->
+          <div class="webcam-zoom-bar" id="regZoomBar">
+            <span class="zoom-label">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px; margin-right: 4px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+              Face Zoom:
+            </span>
+            <input type="range" id="regZoomSlider" min="1.0" max="2.8" step="0.1" value="1.6" oninput="updateWebcamZoom(this.value)" />
+            <span id="regZoomVal" class="zoom-value">1.6x</span>
+          </div>
+
           <div class="webcam-controls">
             <button type="button" class="btn-primary btn-block" id="regCaptureBtn" onclick="capturePassportPhoto()" style="padding: 10px 14px; font-size: 13px;">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px; vertical-align:middle;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-              Capture Passport Photo
+              Capture Face Photo
             </button>
             <button type="button" class="btn-secondary btn-block" id="regRetakeBtn" onclick="retakePassportPhoto()" style="display:none; padding: 10px 14px; font-size: 13px;">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px; vertical-align:middle;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
@@ -614,7 +626,7 @@
           </div>
 
           <div class="webcam-hint">
-            Ensure your face is well-lit, looking directly into the camera lens with no glare or obstruction.
+            <strong>Face Biometric Frame:</strong> Position your face inside the oval. The system automatically isolates and crops strictly to your face, removing your upper body and room background.
           </div>
         </div>
 
