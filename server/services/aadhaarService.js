@@ -38,6 +38,22 @@ function stringSimilarity(s1, s2) {
   return 1 - (matrix[a.length][b.length] / maxLen);
 }
 
+function normalizeDateStr(d) {
+  if (!d) return '';
+  const s = String(d).trim().replace(/\s+/g, '');
+  // DD/MM/YYYY or DD-MM-YYYY
+  const m1 = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (m1) {
+    return `${m1[3]}-${m1[2].padStart(2, '0')}-${m1[1].padStart(2, '0')}`;
+  }
+  // YYYY-MM-DD
+  const m2 = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if (m2) {
+    return `${m2[1]}-${m2[2].padStart(2, '0')}-${m2[3].padStart(2, '0')}`;
+  }
+  return s;
+}
+
 /**
  * Generate standard UIDAI candidate passwords for password-protected e-Aadhaar PDFs
  * Standard UIDAI formula: FIRST 4 LETTERS OF NAME IN CAPS + 4-DIGIT YEAR OF BIRTH (e.g. RAJE1990)
@@ -224,7 +240,7 @@ async function verifyAadhaarDocument(pdfBuffer, userInputs = {}) {
       extractedName = userInputs.officerName;
     }
     if (!extractedDob && userInputs.dob) {
-      extractedDob = userInputs.dob;
+      extractedDob = normalizeDateStr(userInputs.dob);
     }
     if (!extractedGender && userInputs.gender) {
       extractedGender = userInputs.gender;
@@ -236,7 +252,7 @@ async function verifyAadhaarDocument(pdfBuffer, userInputs = {}) {
 
     let dobMatch = true;
     if (userInputs.dob && extractedDob) {
-      dobMatch = userInputs.dob === extractedDob;
+      dobMatch = normalizeDateStr(userInputs.dob) === normalizeDateStr(extractedDob);
     }
 
     let genderMatch = true;

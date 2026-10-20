@@ -5026,15 +5026,101 @@ function retakePassportPhoto() {
 }
 
 // ── FORM INTERACTION & DOB CALCULATION ──
+function parseDobToDate(dobString) {
+  if (!dobString) return null;
+  const s = String(dobString).trim();
+  // DD/MM/YYYY or DD-MM-YYYY
+  const m1 = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (m1) {
+    const day = parseInt(m1[1], 10);
+    const month = parseInt(m1[2], 10) - 1;
+    const year = parseInt(m1[3], 10);
+    const d = new Date(year, month, day);
+    if (d.getFullYear() === year && d.getMonth() === month && d.getDate() === day) {
+      return d;
+    }
+    return null;
+  }
+  // YYYY-MM-DD
+  const m2 = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if (m2) {
+    const year = parseInt(m2[1], 10);
+    const month = parseInt(m2[2], 10) - 1;
+    const day = parseInt(m2[3], 10);
+    const d = new Date(year, month, day);
+    if (d.getFullYear() === year && d.getMonth() === month && d.getDate() === day) {
+      return d;
+    }
+    return null;
+  }
+  return null;
+}
+
+function handleDobKeydown(el, e) {
+  if (e.key === 'Backspace' && el.selectionStart === el.selectionEnd) {
+    const pos = el.selectionStart;
+    if (pos > 0 && el.value[pos - 1] === '/') {
+      e.preventDefault();
+      // Remove both the slash and the preceding digit for smooth backspacing
+      el.value = el.value.slice(0, pos - 2) + el.value.slice(pos);
+      const newPos = Math.max(0, pos - 2);
+      el.setSelectionRange(newPos, newPos);
+      handleDobInput(el, { inputType: 'deleteContentBackward' });
+    }
+  }
+}
+
+function handleDobInput(el, event) {
+  const isDeleting = event && (event.inputType === 'deleteContentBackward' || event.inputType === 'deleteContentForward');
+
+  let raw = el.value || '';
+
+  // Handle ISO format paste (YYYY-MM-DD)
+  const isoMatch = raw.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if (isoMatch) {
+    raw = `${isoMatch[3].padStart(2, '0')}/${isoMatch[2].padStart(2, '0')}/${isoMatch[1]}`;
+  }
+
+  // If user typed a slash after a single digit day (e.g. "5/"), auto-pad to "05/"
+  if (!isDeleting) {
+    if (/^\d\//.test(raw)) {
+      raw = '0' + raw;
+    } else if (/^\d{2}\/\d\//.test(raw)) {
+      raw = raw.slice(0, 3) + '0' + raw.slice(3);
+    }
+  }
+
+  // Strip all non-digits, limit to 8 digits (DDMMYYYY)
+  const digits = raw.replace(/\D/g, '').slice(0, 8);
+
+  let formatted = '';
+  if (digits.length > 0) {
+    if (digits.length < 2) {
+      formatted = digits;
+    } else if (digits.length === 2) {
+      formatted = isDeleting ? digits : (digits + '/');
+    } else if (digits.length < 4) {
+      formatted = digits.slice(0, 2) + '/' + digits.slice(2);
+    } else if (digits.length === 4) {
+      formatted = isDeleting ? (digits.slice(0, 2) + '/' + digits.slice(2)) : (digits.slice(0, 2) + '/' + digits.slice(2) + '/');
+    } else {
+      formatted = digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4);
+    }
+  }
+
+  el.value = formatted;
+  handleDobChange(formatted);
+}
+
 function handleDobChange(dobString) {
   const ageInput = document.getElementById("regAge");
-  if (!dobString) {
+  const birthDate = parseDobToDate(dobString);
+  if (!birthDate) {
     if (ageInput) ageInput.value = "";
     validateRegistrationForm();
     return;
   }
 
-  const birthDate = new Date(dobString);
   const today = new Date();
   let age = today.getFullYear() - birthDate.getFullYear();
   const m = today.getMonth() - birthDate.getMonth();
@@ -5045,6 +5131,12 @@ function handleDobChange(dobString) {
   if (ageInput) ageInput.value = Math.max(18, age);
   validateRegistrationForm();
 }
+
+window.parseDobToDate = parseDobToDate;
+window.handleDobKeydown = handleDobKeydown;
+window.handleDobInput = handleDobInput;
+window.handleDobChange = handleDobChange;
+
 
 function handleRoleSelectionChange(role) {
   const policeBox = document.getElementById("regPoliceFields");
@@ -5233,7 +5325,9 @@ function getMissingRegistrationFields() {
     issues.push({ field: 'regOfficerName', msg: 'Full Name: Please enter your full name as in official records (at least 3 characters).' });
   }
   if (!dob) {
-    issues.push({ field: 'regDob', msg: 'Date of Birth: Please select your date of birth.' });
+    issues.push({ field: 'regDob', msg: 'Date of Birth: Please enter your date of birth (DD/MM/YYYY).' });
+  } else if (!parseDobToDate(dob)) {
+    issues.push({ field: 'regDob', msg: 'Date of Birth: Please enter a valid date in DD/MM/YYYY format.' });
   }
   if (mobileDigits.length !== 10) {
     issues.push({ field: 'regMobile', msg: 'Mobile Number: Please enter a valid 10-digit mobile number.' });
@@ -5289,7 +5383,8 @@ function validateRegistrationForm() {
 
   // Step 2: Officer Personal Info
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  const personalDone = name.length >= 3 && !!dob && mobileDigits.length === 10 && emailValid;
+  const dobValid = !!dob && !!parseDobToDate(dob);
+  const personalDone = name.length >= 3 && dobValid && mobileDigits.length === 10 && emailValid;
   updateReadinessStep("stepPersonal", personalDone, "Officer Personal Info");
 
   // Step 3: MetaMask Wallet

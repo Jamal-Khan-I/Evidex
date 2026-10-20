@@ -796,7 +796,7 @@
           <div class="form-row-3">
             <div class="reg-field-group">
               <label for="regDob">Date of Birth</label>
-              <input id="regDob" type="date" onchange="handleDobChange(this.value)" />
+              <input id="regDob" type="text" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY" oninput="handleDobInput(this, event)" onkeydown="handleDobKeydown(this, event)" />
             </div>
             <div class="reg-field-group">
               <label for="regAge">Age <span class="opt">(Auto-calculated)</span></label>
