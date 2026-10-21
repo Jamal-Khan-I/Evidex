@@ -108,33 +108,63 @@ router.post('/admin/api-keys', (req, res) => {
   }
 });
 
-// Dynamic Gemini Model Resolver (queries ListModels & tries current models: 2.5-flash, 2.0-flash, etc.)
-async function resolveGeminiModel(apiKey) {
-  try {
-    const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey.trim())}`;
-    const listRes = await fetch(listUrl);
-    if (listRes.ok) {
-      const data = await listRes.json();
-      if (data.models && Array.isArray(data.models) && data.models.length > 0) {
+// Dynamic Gemini Model Discovery (Queries Google ListModels directly for active models on caller's key)
+async function getAvailableGeminiModels(apiKey) {
+  const cleanKey = (apiKey || '').trim();
+  if (!cleanKey) return { success: false, error: 'API key is empty' };
+
+  const versions = ['v1beta', 'v1'];
+  let lastError = null;
+
+  for (const ver of versions) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/${ver}/models?key=${encodeURIComponent(cleanKey)}`;
+      const res = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': cleanKey
+        }
+      });
+      const data = await res.json();
+
+      if (res.ok && data.models && Array.isArray(data.models) && data.models.length > 0) {
+        // Filter models that support generateContent
         const supported = data.models.filter(m => 
           !m.supportedGenerationMethods || m.supportedGenerationMethods.includes('generateContent')
         );
+
         if (supported.length > 0) {
-          const best = supported.find(m => m.name.includes('2.5-flash')) ||
-                       supported.find(m => m.name.includes('2.0-flash')) ||
-                       supported.find(m => m.name.includes('1.5-flash-latest')) ||
-                       supported.find(m => m.name.includes('flash')) ||
-                       supported.find(m => m.name.includes('pro')) ||
-                       supported[0];
-          const modelName = best.name.startsWith('models/') ? best.name.substring(7) : best.name;
-          return { model: modelName, displayName: best.displayName || modelName };
+          // Sort to prioritize latest flash models
+          const sorted = [...supported].sort((a, b) => {
+            const aName = (a.name || '').toLowerCase();
+            const bName = (b.name || '').toLowerCase();
+            const aFlash = aName.includes('flash') ? 1 : 0;
+            const bFlash = bName.includes('flash') ? 1 : 0;
+            if (aFlash !== bFlash) return bFlash - aFlash;
+            return bName.localeCompare(aName);
+          });
+
+          const modelNames = sorted.map(m => m.name.startsWith('models/') ? m.name.substring(7) : m.name);
+          return {
+            success: true,
+            version: ver,
+            models: modelNames,
+            bestModel: modelNames[0],
+            displayName: sorted[0].displayName || modelNames[0]
+          };
+        }
+      } else if (!res.ok) {
+        lastError = data.error?.message || `HTTP ${res.status}: Failed to query Google AI models`;
+        if (data.error?.status === 'PERMISSION_DENIED' || data.error?.status === 'UNAUTHENTICATED' || (data.error?.code === 400 && data.error?.message?.includes('API key not valid'))) {
+          return { success: false, error: data.error?.message || 'Invalid Gemini API key' };
         }
       }
+    } catch (e) {
+      lastError = e.message;
     }
-  } catch (err) {
-    console.warn('Failed to resolve Gemini models via ListModels:', err.message);
   }
-  return { model: 'gemini-2.5-flash', displayName: 'Gemini 2.5 Flash' };
+
+  return { success: false, error: lastError || 'Unable to connect to Google Gemini. Please check your API key.' };
 }
 
 router.post('/ai/test-key', async (req, res) => {
@@ -143,51 +173,49 @@ router.post('/ai/test-key', async (req, res) => {
     if (!key) return res.status(400).json({ success: false, error: 'API key is required' });
 
     if (provider === 'gemini' || !provider) {
-      const resolved = await resolveGeminiModel(key);
-      const candidates = [
-        resolved.model,
-        'gemini-2.5-flash',
-        'gemini-2.0-flash',
-        'gemini-2.0-flash-lite',
-        'gemini-1.5-flash-latest',
-        'gemini-1.5-pro-latest',
-        'gemini-pro'
-      ];
-      const uniqueCandidates = [...new Set(candidates.filter(Boolean))];
+      const discovery = await getAvailableGeminiModels(key);
+      if (!discovery.success) {
+        return res.status(400).json({
+          success: false,
+          error: discovery.error || 'Invalid Gemini API key or connection failed'
+        });
+      }
 
-      let lastError = null;
-      for (const model of uniqueCandidates) {
+      const ver = discovery.version || 'v1beta';
+      let lastGenError = null;
+
+      // Test top active models returned by Google for this key
+      for (const model of discovery.models.slice(0, 5)) {
         try {
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key.trim())}`;
-          const apiRes = await fetch(url, {
+          const genUrl = `https://generativelanguage.googleapis.com/${ver}/models/${model}:generateContent?key=${encodeURIComponent(key.trim())}`;
+          const genRes = await fetch(genUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': key.trim()
+            },
             body: JSON.stringify({
-              contents: [{ parts: [{ text: 'Respond with exactly: OK' }] }]
+              contents: [{ parts: [{ text: 'Respond with OK' }] }]
             })
           });
-          const data = await apiRes.json();
-          if (apiRes.ok) {
+          const genData = await genRes.json();
+          if (genRes.ok) {
             return res.json({
               success: true,
               message: `Google Gemini verified successfully! (Active Model: ${model})`,
               model
             });
           } else {
-            lastError = data.error?.message || 'Model call failed';
-            // Stop early on auth errors
-            if (data.error?.status === 'PERMISSION_DENIED' || data.error?.status === 'UNAUTHENTICATED' || (data.error?.code === 400 && data.error?.message?.includes('API key not valid'))) {
-              return res.status(400).json({ success: false, error: data.error?.message || 'Invalid Gemini API key' });
-            }
+            lastGenError = genData.error?.message || 'Generation failed';
           }
-        } catch (mErr) {
-          lastError = mErr.message;
+        } catch (e) {
+          lastGenError = e.message;
         }
       }
 
       return res.status(400).json({
         success: false,
-        error: lastError || 'Unable to connect to Google Gemini with this API key'
+        error: lastGenError || 'Failed to generate response with available Gemini models'
       });
     } else {
       const apiRes = await fetch('https://api.openai.com/v1/models', {
@@ -258,49 +286,45 @@ REQUIREMENTS:
 2. Keep it factual to the evidence while maintaining an engaging, articulate, professional storytelling tone.
 3. Keep the narration concise (~250-320 words) so it is perfect for voice narration.`;
 
-        const resolved = await resolveGeminiModel(apiKey);
-        const candidates = [
-          resolved.model,
-          'gemini-2.5-flash',
-          'gemini-2.0-flash',
-          'gemini-2.0-flash-lite',
-          'gemini-1.5-flash-latest',
-          'gemini-pro'
-        ];
-        const uniqueCandidates = [...new Set(candidates.filter(Boolean))];
-
-        for (const model of uniqueCandidates) {
-          try {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
-            const aiRes = await fetch(url, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { maxOutputTokens: 800, temperature: 0.7 }
-              })
-            });
-            const aiData = await aiRes.json();
-            if (aiRes.ok && aiData.candidates && aiData.candidates[0]?.content?.parts[0]?.text) {
-              const rawStory = aiData.candidates[0].content.parts[0].text;
-              const formattedHtml = rawStory
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                .replace(/\n\n/g, '<br><br>')
-                .replace(/\n/g, '<br>');
-
-              return res.json({
-                success: true,
-                isAiGenerated: true,
-                modelUsed: model,
-                caseNumber: targetCase.case_number,
-                title: targetCase.title || targetCase.description,
-                storyHtml: formattedHtml,
-                storyPlain: rawStory.replace(/[*#_]/g, '')
+        const discovery = await getAvailableGeminiModels(apiKey);
+        if (discovery.success && discovery.models.length > 0) {
+          const ver = discovery.version || 'v1beta';
+          for (const model of discovery.models.slice(0, 5)) {
+            try {
+              const url = `https://generativelanguage.googleapis.com/${ver}/models/${model}:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
+              const aiRes = await fetch(url, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-goog-api-key': apiKey.trim()
+                },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: prompt }] }],
+                  generationConfig: { maxOutputTokens: 800, temperature: 0.7 }
+                })
               });
+              const aiData = await aiRes.json();
+              if (aiRes.ok && aiData.candidates && aiData.candidates[0]?.content?.parts[0]?.text) {
+                const rawStory = aiData.candidates[0].content.parts[0].text;
+                const formattedHtml = rawStory
+                  .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                  .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                  .replace(/\n\n/g, '<br><br>')
+                  .replace(/\n/g, '<br>');
+
+                return res.json({
+                  success: true,
+                  isAiGenerated: true,
+                  modelUsed: model,
+                  caseNumber: targetCase.case_number,
+                  title: targetCase.title || targetCase.description,
+                  storyHtml: formattedHtml,
+                  storyPlain: rawStory.replace(/[*#_]/g, '')
+                });
+              }
+            } catch (mErr) {
+              console.warn(`Model ${model} failed, trying next candidate:`, mErr.message);
             }
-          } catch (mErr) {
-            console.warn(`Model ${model} failed, trying next candidate:`, mErr.message);
           }
         }
       } catch (geminiErr) {

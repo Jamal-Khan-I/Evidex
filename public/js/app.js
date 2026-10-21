@@ -2177,7 +2177,7 @@ async function testAdminApiKey() {
     if (res && res.success) {
       if (notice) {
         notice.style.color = "#16a34a";
-        notice.textContent = "✓ Connection Verified! Google Gemini model responded successfully.";
+        notice.textContent = "✓ " + (res.message || "Connection Verified! Google Gemini model responded successfully.");
       }
     } else {
       if (notice) {
