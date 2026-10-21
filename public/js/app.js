@@ -2070,28 +2070,79 @@ async function loadAdminUsersRoster() {
 // ═══════════════════════════════════════════════════════════════════
 // ADMIN API KEYS CONTROLLER
 // ═══════════════════════════════════════════════════════════════════
+function updateGeminiBadge(isActive) {
+  const badge = document.getElementById("geminiActiveBadge");
+  if (!badge) return;
+  if (isActive) {
+    badge.textContent = "Active";
+    badge.style.background = "#dcfce7";
+    badge.style.color = "#15803d";
+    badge.style.border = "1px solid #86efac";
+  } else {
+    badge.textContent = "Inactive";
+    badge.style.background = "#fee2e2";
+    badge.style.color = "#b91c1c";
+    badge.style.border = "1px solid #fca5a5";
+  }
+}
+
 async function loadAdminApiKeysPanel() {
   const geminiInput = document.getElementById("adminGeminiApiKey");
-  const badge = document.getElementById("aiKeyStatusBadge");
   const notice = document.getElementById("adminApiKeySaveNotice");
   if (notice) notice.innerHTML = "";
 
+  if (geminiInput && !geminiInput.dataset.boundListener) {
+    geminiInput.dataset.boundListener = "true";
+    geminiInput.addEventListener("input", () => {
+      const val = (geminiInput.value || "").trim();
+      const verifiedKey = localStorage.getItem("evidex_gemini_verified_key") || "";
+      if (!val) {
+        updateGeminiBadge(false);
+      } else if (val === verifiedKey) {
+        updateGeminiBadge(true);
+      } else {
+        updateGeminiBadge(false);
+      }
+    });
+  }
+
   try {
     const res = await window.epsApi.getAdminApiKeys();
-    if (res && res.success) {
-      if (geminiInput) geminiInput.value = res.geminiApiKey || localStorage.getItem("evidex_gemini_api_key") || "";
-      if (badge) {
-        if (res.hasGemini || geminiInput?.value) {
-          badge.style.display = "inline-block";
-          badge.className = "badge-status-approved";
-          badge.textContent = "Gemini AI Active";
+    const storedKey = (res && res.geminiApiKey) || localStorage.getItem("evidex_gemini_api_key") || "";
+    if (geminiInput) geminiInput.value = storedKey;
+
+    if (!storedKey) {
+      updateGeminiBadge(false);
+      return;
+    }
+
+    const verifiedKey = localStorage.getItem("evidex_gemini_verified_key");
+    if (verifiedKey && verifiedKey === storedKey) {
+      updateGeminiBadge(true);
+    } else {
+      updateGeminiBadge(false);
+    }
+
+    // Verify in real-time whether the key is REALLY active
+    window.epsApi.testApiKey(storedKey, 'gemini').then((testRes) => {
+      const currentInputVal = (geminiInput?.value || "").trim();
+      if (currentInputVal === storedKey) {
+        if (testRes && testRes.success) {
+          updateGeminiBadge(true);
+          localStorage.setItem("evidex_gemini_verified_key", storedKey);
         } else {
-          badge.style.display = "none";
+          updateGeminiBadge(false);
+          localStorage.removeItem("evidex_gemini_verified_key");
         }
       }
-    }
+    }).catch(() => {
+      updateGeminiBadge(false);
+    });
   } catch (e) {
-    if (geminiInput) geminiInput.value = localStorage.getItem("evidex_gemini_api_key") || "";
+    const localKey = localStorage.getItem("evidex_gemini_api_key") || "";
+    if (geminiInput) geminiInput.value = localKey;
+    const verifiedKey = localStorage.getItem("evidex_gemini_verified_key");
+    updateGeminiBadge(!!(localKey && verifiedKey === localKey));
   }
 }
 
@@ -2110,40 +2161,62 @@ function toggleApiKeyVisibility(inputId, btn) {
 async function saveAdminApiKeys() {
   const geminiInput = document.getElementById("adminGeminiApiKey");
   const notice = document.getElementById("adminApiKeySaveNotice");
-  const badge = document.getElementById("aiKeyStatusBadge");
-
   const geminiApiKey = (geminiInput?.value || "").trim();
 
-  if (geminiApiKey) localStorage.setItem("evidex_gemini_api_key", geminiApiKey);
-  else localStorage.removeItem("evidex_gemini_api_key");
+  if (geminiApiKey) {
+    localStorage.setItem("evidex_gemini_api_key", geminiApiKey);
+  } else {
+    localStorage.removeItem("evidex_gemini_api_key");
+    localStorage.removeItem("evidex_gemini_verified_key");
+    updateGeminiBadge(false);
+  }
 
   try {
     if (notice) {
       notice.style.color = "#2563eb";
-      notice.textContent = "Saving Gemini API key to database...";
+      notice.textContent = "Saving and validating Gemini API key...";
     }
     const res = await window.epsApi.saveAdminApiKeys({ geminiApiKey });
     if (res && res.success) {
-      if (notice) {
-        notice.style.color = "#16a34a";
-        notice.textContent = "✓ Gemini API Key saved successfully! Evidex AI is now active and intelligent.";
+      if (!geminiApiKey) {
+        if (notice) {
+          notice.style.color = "#64748b";
+          notice.textContent = "Gemini API Key removed.";
+        }
+        updateGeminiBadge(false);
+        return;
       }
-      if (badge && geminiApiKey) {
-        badge.style.display = "inline-block";
-        badge.className = "badge-status-approved";
-        badge.textContent = "Gemini AI Active";
+
+      // Check real-time connection status
+      const testRes = await window.epsApi.testApiKey(geminiApiKey, 'gemini');
+      if (testRes && testRes.success) {
+        updateGeminiBadge(true);
+        localStorage.setItem("evidex_gemini_verified_key", geminiApiKey);
+        if (notice) {
+          notice.style.color = "#16a34a";
+          notice.textContent = "✓ Gemini API Key saved and verified active!";
+        }
+      } else {
+        updateGeminiBadge(false);
+        localStorage.removeItem("evidex_gemini_verified_key");
+        if (notice) {
+          notice.style.color = "#dc2626";
+          notice.textContent = "Key saved, but Google Gemini connection failed: " + (testRes?.error || "Invalid key");
+        }
       }
     } else {
       if (notice) {
         notice.style.color = "#dc2626";
         notice.textContent = "Failed to save: " + (res?.error || "Unknown error");
       }
+      updateGeminiBadge(false);
     }
   } catch (err) {
     if (notice) {
-      notice.style.color = "#16a34a";
-      notice.textContent = "✓ Gemini API Key saved to local session.";
+      notice.style.color = "#dc2626";
+      notice.textContent = "Error saving key: " + err.message;
     }
+    updateGeminiBadge(false);
   }
 }
 
@@ -2153,6 +2226,7 @@ async function testAdminApiKey() {
   const key = (geminiInput?.value || "").trim() || localStorage.getItem("evidex_gemini_api_key") || "";
 
   if (!key) {
+    updateGeminiBadge(false);
     if (notice) {
       notice.style.color = "#dc2626";
       notice.textContent = "Please enter a Gemini API Key first.";
@@ -2168,17 +2242,22 @@ async function testAdminApiKey() {
   try {
     const res = await window.epsApi.testApiKey(key, 'gemini');
     if (res && res.success) {
+      updateGeminiBadge(true);
+      localStorage.setItem("evidex_gemini_verified_key", key);
       if (notice) {
         notice.style.color = "#16a34a";
         notice.textContent = "✓ " + (res.message || "Connection Verified! Google Gemini model responded successfully.");
       }
     } else {
+      updateGeminiBadge(false);
+      localStorage.removeItem("evidex_gemini_verified_key");
       if (notice) {
         notice.style.color = "#dc2626";
         notice.textContent = "Connection test failed: " + (res?.error || "Invalid key");
       }
     }
   } catch (err) {
+    updateGeminiBadge(false);
     if (notice) {
       notice.style.color = "#dc2626";
       notice.textContent = "Test error: " + err.message;
