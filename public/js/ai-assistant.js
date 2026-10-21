@@ -1,17 +1,15 @@
 /**
  * ════════════════════════════════════════════════════════════════════════════
- * EVIDEX AI ASSISTANT — INTERACTIVE AVATAR & RPG GAME DIALOGUE ENGINE
+ * EVIDEX AI ASSISTANT — LIGHT THEME INTERACTIVE AVATAR & CASE STORY ENGINE
  * ════════════════════════════════════════════════════════════════════════════
- * Features:
- *  1. Eye-Tracking: Eyes track user cursor in real-time with spherical physics & blinking.
- *  2. Video Integration:
- *      - Thinking state: Loops colorful rotating rings animation from bloub-default-cycle_2.mp4.
- *      - Notification state: Plays blue dot notification animation when answer is ready.
- *  3. Game-Style Speech Message Box:
- *      - RPG speech bubble coming directly from avatar with character name & typewriter effect.
- *      - Text & Voice input (Web Speech API).
- *      - Web Audio API synthesized chimes & blips.
- *  4. Case Intelligence: Real queries on system cases, custody chains, & forensics.
+ * Updates:
+ *  1. Eye Geometry: Upright, parallel pill capsules with generous separation
+ *     matching the user's reference image.
+ *  2. Medium, noticeable avatar size (58px anchor, 52px core).
+ *  3. Light theme game dialogue box without corner brackets or v2.4 badge.
+ *  4. Clean message bubbles (no sender labels "YOU" / "Evidex AI").
+ *  5. Clean header: "EVIDEX AI" without star symbols or sub-badges.
+ *  6. Storytelling Case Engine with voice narration for registered cases.
  * ════════════════════════════════════════════════════════════════════════════
  */
 
@@ -31,9 +29,10 @@
   let isSoundEnabled = true;
   let isListeningVoice = false;
   let typewriterInterval = null;
-  let activeSpeech = null;
+  let activeSpeechUtterance = null;
+  let isVoiceSpeaking = false;
 
-  // Eye tracking physics state
+  // Eye tracking physics state (centered upright parallel capsules)
   const eyeState = {
     currentX: 0,
     currentY: 0,
@@ -42,11 +41,9 @@
     blinkScale: 1.0,
     isBlinking: false,
     nextBlinkTime: Date.now() + 3000,
-    gazeAngle: -0.4,
     hoverScale: 1.0
   };
 
-  // Cursor tracker
   const mouse = {
     x: window.innerWidth * 0.5,
     y: window.innerHeight * 0.5,
@@ -58,9 +55,7 @@
   function getAudioContext() {
     if (!audioCtx) {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      if (AudioContextClass) {
-        audioCtx = new AudioContextClass();
-      }
+      if (AudioContextClass) audioCtx = new AudioContextClass();
     }
     if (audioCtx && audioCtx.state === 'suspended') {
       audioCtx.resume();
@@ -74,7 +69,6 @@
       const ctx = getAudioContext();
       if (!ctx) return;
       const now = ctx.currentTime;
-      // High-tech 2-tone pleasant crystal ping
       const osc1 = ctx.createOscillator();
       const osc2 = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -86,7 +80,7 @@
       osc2.frequency.setValueAtTime(1760, now + 0.08);
 
       gain.gain.setValueAtTime(0.001, now);
-      gain.gain.linearRampToValueAtTime(0.18, now + 0.03);
+      gain.gain.linearRampToValueAtTime(0.16, now + 0.03);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
 
       osc1.connect(gain);
@@ -97,9 +91,7 @@
       osc2.start(now + 0.08);
       osc1.stop(now + 0.6);
       osc2.stop(now + 0.6);
-    } catch (e) {
-      // Audio autoplay policy fallback
-    }
+    } catch (e) {}
   }
 
   function playTypeBlip() {
@@ -112,9 +104,9 @@
       const gain = ctx.createGain();
 
       osc.type = 'triangle';
-      osc.frequency.setValueAtTime(900 + Math.random() * 200, now);
+      osc.frequency.setValueAtTime(850 + Math.random() * 200, now);
 
-      gain.gain.setValueAtTime(0.015, now);
+      gain.gain.setValueAtTime(0.012, now);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.03);
 
       osc.connect(gain);
@@ -135,11 +127,11 @@
       const gain = ctx.createGain();
 
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(320, now);
-      osc.frequency.exponentialRampToValueAtTime(640, now + 0.08);
+      osc.frequency.setValueAtTime(340, now);
+      osc.frequency.exponentialRampToValueAtTime(680, now + 0.08);
 
       gain.gain.setValueAtTime(0.001, now);
-      gain.gain.linearRampToValueAtTime(0.15, now + 0.02);
+      gain.gain.linearRampToValueAtTime(0.12, now + 0.02);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
 
       osc.connect(gain);
@@ -150,21 +142,18 @@
     } catch (e) {}
   }
 
-  // ── INJECT DOM WIDGET ──
+  // ── INJECT DOM WIDGET (LIGHT THEME, CLEAN HEADER) ──
   function injectWidgetDOM() {
     if (document.getElementById('evidexAiWidget')) return;
 
     const widget = document.createElement('div');
     widget.id = 'evidexAiWidget';
     widget.innerHTML = `
-      <!-- RPG Game Dialogue Box -->
+      <!-- Light Theme RPG Game Dialogue Box -->
       <div id="aiDialogueBox" role="dialog" aria-label="Evidex AI Assistant">
-        <div class="ai-box-corner top-left"></div>
-        <div class="ai-box-corner top-right"></div>
-        <div class="ai-box-corner bottom-left"></div>
         <div class="ai-dialogue-tail"></div>
 
-        <!-- Dialogue Header -->
+        <!-- Clean Dialogue Header -->
         <div class="ai-dialogue-header">
           <div class="ai-header-profile">
             <div class="ai-mini-portrait">
@@ -172,18 +161,11 @@
               <div class="portrait-eye"></div>
             </div>
             <div class="ai-header-info">
-              <span class="ai-speaker-name">
-                ✦ EVIDEX AI
-                <span style="font-size: 10px; color: #38bdf8; font-weight: 500;">v2.4</span>
-              </span>
-              <span class="ai-badge-status">
-                <span class="ai-status-dot"></span>
-                <span>Case Intelligence Active</span>
-              </span>
+              <span class="ai-speaker-name">EVIDEX AI</span>
             </div>
           </div>
           <div class="ai-header-controls">
-            <button type="button" class="ai-icon-btn active" id="aiAudioToggleBtn" title="Toggle Voice/Sound Effects">
+            <button type="button" class="ai-icon-btn active" id="aiAudioToggleBtn" title="Toggle Voice/Sound">
               🔊
             </button>
             <button type="button" class="ai-icon-btn" id="aiCloseBoxBtn" title="Close Dialogue">
@@ -192,21 +174,23 @@
           </div>
         </div>
 
-        <!-- Dialogue Scrollable Message Feed -->
+        <!-- Dialogue Message Feed -->
         <div class="ai-dialogue-body" id="aiChatFeed">
           <div class="ai-msg assistant">
-            <div class="ai-msg-sender">✦ Evidex AI Assistant</div>
             <div class="ai-msg-bubble">
               Greetings, Officer. I am your <strong>Evidex Case Intelligence Assistant</strong>. 
-              I track blockchain case dossiers, tamper audits, forensic lab reports, and custody transfers. 
+              I track blockchain case dossiers, tamper audits, forensic lab reports, and custody transfers.
               <br><br>
-              How can I assist your investigation today?
+              Ask me to explain the last registered case, summarize dossiers, or inspect chain of custody.
             </div>
           </div>
         </div>
 
-        <!-- Quick Question Action Chips -->
+        <!-- Quick Action Chips -->
         <div class="ai-suggestions-bar" id="aiSuggestionsBar">
+          <button type="button" class="ai-chip primary-chip" data-query="Explain about the last case that was registered like a story">
+            📖 Story of Last Case
+          </button>
           <button type="button" class="ai-chip" data-query="Summarize all registered cases">
             📁 All Cases Summary
           </button>
@@ -215,9 +199,6 @@
           </button>
           <button type="button" class="ai-chip" data-query="How does chain of custody verification work?">
             ⚖️ Verify Custody
-          </button>
-          <button type="button" class="ai-chip" data-query="How to register a case with forensics request?">
-            📋 Register Case Guide
           </button>
         </div>
 
@@ -247,7 +228,7 @@
         </div>
       </div>
 
-      <!-- Floating Avatar Anchor -->
+      <!-- Medium Floating Avatar Anchor -->
       <div class="ai-avatar-anchor" id="aiAvatarAnchor" title="Click to open Evidex AI Assistant">
         <div class="ai-avatar-glow"></div>
         <div class="ai-notif-orb" id="aiNotifOrb"></div>
@@ -256,11 +237,6 @@
           <canvas id="aiAvatarCanvas" width="152" height="152"></canvas>
           <!-- 2. Chroma-keyed Video Canvas for Thinking & Notification Animations -->
           <canvas id="aiVideoCanvas" width="152" height="152"></canvas>
-        </div>
-        <!-- Tooltip Hint when idle -->
-        <div class="ai-idle-hint" id="aiIdleHint">
-          <span class="ai-hint-sparkle">✦</span>
-          <span>Ask AI Assistant</span>
         </div>
       </div>
 
@@ -273,7 +249,9 @@
     document.body.appendChild(widget);
   }
 
-  // ── LIVE CANVAS RENDERING & EYE TRACKING ──
+  // ── LIVE CANVAS RENDERING & EYE TRACKING (MATCHING REFERENCE IMAGE) ──
+  const maxDisplacement = 22; // Maximum pupil offset from center of sphere
+
   function initAvatarCanvas() {
     const canvas = document.getElementById('aiAvatarCanvas');
     if (!canvas) return;
@@ -283,20 +261,12 @@
     const vCtx = videoCanvas ? videoCanvas.getContext('2d') : null;
     const video = document.getElementById('aiAvatarVideo');
 
-    // Video load check
-    if (video) {
-      video.load();
-    }
+    if (video) video.load();
 
-    // Render loop running at 60fps
     function renderLoop() {
-      // 1. Update eye tracking physics
       updateEyePhysics();
-
-      // 2. Draw Interactive Canvas
       drawAvatar(ctx, canvas.width, canvas.height);
 
-      // 3. Draw Video Canvas if thinking or notification
       if (currentState === 'thinking' || currentState === 'notification') {
         if (vCtx && video && !video.paused) {
           drawVideoFrame(vCtx, video, videoCanvas.width, videoCanvas.height);
@@ -317,44 +287,34 @@
     const avatarCenterX = rect.left + rect.width / 2;
     const avatarCenterY = rect.top + rect.height / 2;
 
-    // Vector from avatar center to mouse cursor
     const dx = mouse.x - avatarCenterX;
     const dy = mouse.y - avatarCenterY;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
-    // Limit displacement to sphere surface radius (max ~18px on 76px avatar = 36px on 152px canvas)
-    const maxRadius = 34; // canvas coordinate units
     const angle = Math.atan2(dy, dx);
-    const targetDist = Math.min(maxRadius, dist / 14);
+    const targetDist = Math.min(maxDisplacement, dist / 18);
 
-    // Default resting eye position: upper-right quadrant (like reference image)
-    const baseOffsetX = 18;
-    const baseOffsetY = -18;
+    // At rest: centered in the middle of the black ball
+    const targetEyeX = Math.cos(angle) * targetDist;
+    const targetEyeY = Math.sin(angle) * targetDist;
 
-    // Smooth blending between resting upper-right pose and dynamic cursor direction
-    const cursorWeight = Math.min(1.0, dist / 40);
-    const targetEyeX = baseOffsetX * (1 - cursorWeight) + Math.cos(angle) * targetDist * cursorWeight;
-    const targetEyeY = baseOffsetY * (1 - cursorWeight) + Math.sin(angle) * targetDist * cursorWeight;
-
-    // Dampening / Lerp
+    // Smooth Lerp
     eyeState.currentX += (targetEyeX - eyeState.currentX) * 0.12;
     eyeState.currentY += (targetEyeY - eyeState.currentY) * 0.12;
-    eyeState.gazeAngle += (angle - eyeState.gazeAngle) * 0.1;
 
     // Blinking logic
     const now = Date.now();
     if (!eyeState.isBlinking && now > eyeState.nextBlinkTime) {
       eyeState.isBlinking = true;
       eyeState.blinkStartTime = now;
-      eyeState.blinkDuration = 130; // ms
+      eyeState.blinkDuration = 120;
       eyeState.nextBlinkTime = now + 3500 + Math.random() * 3000;
     }
 
     if (eyeState.isBlinking) {
       const elapsed = now - eyeState.blinkStartTime;
-      const progress = elapsed / eyeState.duration;
+      const progress = elapsed / eyeState.blinkDuration;
       if (progress < 1) {
-        // Squash to 0.05 at 50%, then expand back
         eyeState.blinkScale = Math.max(0.06, Math.abs(Math.cos(progress * Math.PI)));
       } else {
         eyeState.isBlinking = false;
@@ -364,8 +324,7 @@
       eyeState.blinkScale = 1.0;
     }
 
-    // Hover scale
-    const targetHover = mouse.isOverAvatar ? 1.15 : 1.0;
+    const targetHover = mouse.isOverAvatar ? 1.08 : 1.0;
     eyeState.hoverScale += (targetHover - eyeState.hoverScale) * 0.15;
   }
 
@@ -374,24 +333,22 @@
 
     const cx = w / 2;
     const cy = h / 2;
-    const radius = 68; // Main black ball radius
+    const radius = 68; // Main black ball radius on 152px canvas
 
-    // ── 1. DRAW BLACK SPHERICAL BODY ──
+    // ── 1. DRAW PURE BLACK SPHERICAL BODY ──
     ctx.save();
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetY = 6;
 
-    // Subtle drop shadow
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
-    ctx.shadowBlur = 16;
-    ctx.shadowOffsetY = 8;
-
-    // Sphere gradient with 3D depth
+    // Deep rich black ball matching reference image
     const sphereGrad = ctx.createRadialGradient(
-      cx - radius * 0.28, cy - radius * 0.28, radius * 0.1,
+      cx - radius * 0.25, cy - radius * 0.25, radius * 0.1,
       cx, cy, radius
     );
-    sphereGrad.addColorStop(0.0, '#2d3038'); // Specular highlight
-    sphereGrad.addColorStop(0.35, '#121418');
-    sphereGrad.addColorStop(0.75, '#060709');
+    sphereGrad.addColorStop(0.0, '#1c1e24');
+    sphereGrad.addColorStop(0.3, '#0c0d10');
+    sphereGrad.addColorStop(0.7, '#000000');
     sphereGrad.addColorStop(1.0, '#000000');
 
     ctx.fillStyle = sphereGrad;
@@ -400,58 +357,39 @@
     ctx.fill();
     ctx.restore();
 
-    // Specular top rim shine
+    // ── 2. DRAW TWO UPRIGHT, PARALLEL PILL EYES (MATCHING USER REFERENCE IMAGE) ──
     ctx.save();
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius - 1, 0, Math.PI * 2);
-    ctx.clip();
-
-    const rimGrad = ctx.createLinearGradient(cx, cy - radius, cx, cy + radius);
-    rimGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0.22)');
-    rimGrad.addColorStop(0.2, 'rgba(255, 255, 255, 0.05)');
-    rimGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.8)');
-    ctx.strokeStyle = rimGrad;
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
-    ctx.restore();
-
-    // ── 2. DRAW TWO WHITE PILL EYES ──
-    ctx.save();
-    // Clip inside the spherical body so eyes never poke outside the ball
+    // Clip inside the spherical body
     ctx.beginPath();
     ctx.arc(cx, cy, radius - 4, 0, Math.PI * 2);
     ctx.clip();
 
-    // Eye cluster coordinates based on gaze tracking
+    // Eye cluster coordinates based on gaze tracking (resting slightly above center like reference image)
     const eyesCenterX = cx + eyeState.currentX;
-    const eyesCenterY = cy + eyeState.currentY;
+    const eyesCenterY = cy + eyeState.currentY - 4;
 
-    // Eye specs matching reference image (pill/capsule shape)
-    const eyeWidth = 13 * eyeState.hoverScale;
-    const eyeHeight = 28 * eyeState.hoverScale * eyeState.blinkScale;
-    const eyeSpacing = 14;
-
-    // Dynamic tilt angle: base tilt ~ -24deg plus subtle gaze influence
-    const tilt = -0.42 + (eyeState.currentX / maxRadius) * 0.15;
+    // Upright capsule dimensions and wide spacing matching reference image (27.4% diameter spacing, 16.7% gap)
+    const eyeWidth = 15 * eyeState.hoverScale;
+    const eyeHeight = 30 * eyeState.hoverScale * eyeState.blinkScale;
+    const eyeSpacing = 38; // 38px center-to-center spacing, 23px gap between eyes
 
     ctx.fillStyle = '#ffffff';
 
-    // Left Eye
-    drawPillEye(ctx, eyesCenterX - eyeSpacing * 0.55, eyesCenterY, eyeWidth, eyeHeight, tilt);
+    // Left Eye (upright vertical pill capsule)
+    drawPillEye(ctx, eyesCenterX - eyeSpacing / 2, eyesCenterY, eyeWidth, eyeHeight);
 
-    // Right Eye (slightly offset higher & right matching reference image)
-    drawPillEye(ctx, eyesCenterX + eyeSpacing * 0.65, eyesCenterY - 4, eyeWidth, eyeHeight, tilt);
+    // Right Eye (upright vertical pill capsule, parallel at exact same Y)
+    drawPillEye(ctx, eyesCenterX + eyeSpacing / 2, eyesCenterY, eyeWidth, eyeHeight);
 
     ctx.restore();
   }
 
-  // Draw a smooth pill/capsule shape rotated by angle
-  function drawPillEye(ctx, x, y, width, height, angle) {
-    if (height < 1.5) return; // Closed eyelid during blink
+  // Draw upright pill/capsule shape with rounded end caps
+  function drawPillEye(ctx, x, y, width, height) {
+    if (height < 1.5) return; // Closed eyelid
 
     ctx.save();
     ctx.translate(x, y);
-    ctx.rotate(angle);
 
     const rx = width / 2;
     const ry = height / 2;
@@ -466,14 +404,9 @@
     ctx.arcTo(-rx, ry, -rx, ry - r, r);
     ctx.closePath();
 
-    ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
-    ctx.shadowBlur = 6;
     ctx.fill();
-
     ctx.restore();
   }
-
-  const maxRadius = 34;
 
   // ── VIDEO FRAME RENDERING WITH CHROMA-KEYING ──
   function drawVideoFrame(ctx, video, w, h) {
@@ -482,12 +415,10 @@
     ctx.clearRect(0, 0, w, h);
     ctx.drawImage(video, 0, 0, w, h);
 
-    // Fast chroma-key out outer white background
     const imgData = ctx.getImageData(0, 0, w, h);
     const data = imgData.data;
 
-    // BFS Flood Fill from corners to make white exterior 100% transparent
-    // This preserves white eyes inside the black ball!
+    // BFS Flood Fill from outer edges to make exterior white transparent
     const visited = new Uint8Array(w * h);
     const queue = new Int32Array(w * h);
     let head = 0, tail = 0;
@@ -500,7 +431,6 @@
       }
     }
 
-    // Push 4 borders
     for (let x = 0; x < w; x++) {
       push(x, 0);
       push(x, h - 1);
@@ -515,9 +445,8 @@
       const p = idx * 4;
       const r = data[p], g = data[p + 1], b = data[p + 2];
 
-      // If outer pixel is near-white background
       if (r > 215 && g > 215 && b > 215) {
-        data[p + 3] = 0; // Transparent!
+        data[p + 3] = 0;
         const px = idx % w;
         const py = (idx / w) | 0;
         if (px > 0) push(px - 1, py);
@@ -525,7 +454,6 @@
         if (py > 0) push(px, py - 1);
         if (py < h - 1) push(px, py + 1);
       } else if (r > 195 && g > 195 && b > 195) {
-        // Soft anti-aliased edge
         const bright = (r + g + b) / 3;
         data[p + 3] = Math.max(0, Math.min(255, (255 - bright) * 3));
       }
@@ -576,7 +504,6 @@
         video.ontimeupdate = () => {
           if (currentState === 'notification' && video.currentTime >= NOTIF_END) {
             video.pause();
-            // Transition smoothly to speaking/idle with notif orb active
             setTimeout(() => {
               if (currentState === 'notification') {
                 setState('speaking');
@@ -586,7 +513,6 @@
         };
       }
     } else {
-      // Idle or speaking
       if (videoCanvas) videoCanvas.style.opacity = '0';
       if (avatarCanvas) avatarCanvas.style.opacity = '1';
       if (video) video.pause();
@@ -601,20 +527,16 @@
   function openDialogueBox() {
     const box = document.getElementById('aiDialogueBox');
     const anchor = document.getElementById('aiAvatarAnchor');
-    const hint = document.getElementById('aiIdleHint');
     if (!box) return;
 
     isBoxOpen = true;
     box.classList.add('open');
-    if (hint) hint.classList.remove('visible');
     playPop();
 
-    // Clear notification badge
     if (anchor) anchor.classList.remove('has-notif');
     const notifOrb = document.getElementById('aiNotifOrb');
     if (notifOrb) notifOrb.style.display = 'none';
 
-    // Focus input
     setTimeout(() => {
       const input = document.getElementById('aiPromptInput');
       if (input) input.focus();
@@ -627,9 +549,10 @@
     isBoxOpen = false;
     box.classList.remove('open');
     if (isListeningVoice) stopVoiceRecognition();
+    stopStoryVoice();
   }
 
-  // ── RPG TYPEWRITER DIALOGUE RENDERING ──
+  // ── CLEAN MESSAGE RENDERING (NO SENDER LABELS) ──
   function appendUserMessage(text) {
     const feed = document.getElementById('aiChatFeed');
     if (!feed) return;
@@ -637,7 +560,6 @@
     const msgEl = document.createElement('div');
     msgEl.className = 'ai-msg user';
     msgEl.innerHTML = `
-      <div class="ai-msg-sender">👮 YOU</div>
       <div class="ai-msg-bubble">${escapeHtml(text)}</div>
     `;
     feed.appendChild(msgEl);
@@ -655,7 +577,7 @@
       thinkingEl.className = 'ai-thinking-indicator';
       thinkingEl.innerHTML = `
         <div class="ai-thinking-spinner"></div>
-        <span>✦ Analyzing case dossiers & blockchain records...</span>
+        <span>Analyzing case records &amp; reconstructing dossier...</span>
       `;
       feed.appendChild(thinkingEl);
     }
@@ -667,7 +589,77 @@
     if (thinkingEl) thinkingEl.remove();
   }
 
-  function typewriteAssistantResponse(htmlContent, plainText) {
+  // ── VOICE SPEECH NARRATION FOR STORIES ──
+  function speakStoryText(plainText, storyControlsContainer) {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+
+    const cleanText = plainText.replace(/[*#_]/g, '');
+    activeSpeechUtterance = new SpeechSynthesisUtterance(cleanText);
+    activeSpeechUtterance.rate = 1.0;
+    activeSpeechUtterance.pitch = 1.0;
+
+    // Pick best English voice if available
+    const voices = window.speechSynthesis.getVoices();
+    const naturalVoice = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Samantha')));
+    if (naturalVoice) activeSpeechUtterance.voice = naturalVoice;
+
+    isVoiceSpeaking = true;
+
+    if (storyControlsContainer) {
+      storyControlsContainer.innerHTML = `
+        <span>🔊 Speaking story aloud...</span>
+        <div style="display:flex; gap:6px;">
+          <button type="button" class="ai-voice-btn-pill" id="aiPauseStoryBtn">⏸ Pause</button>
+          <button type="button" class="ai-voice-btn-pill danger" id="aiStopStoryBtn">⏹ Stop</button>
+        </div>
+      `;
+
+      const pauseBtn = storyControlsContainer.querySelector('#aiPauseStoryBtn');
+      const stopBtn = storyControlsContainer.querySelector('#aiStopStoryBtn');
+
+      if (pauseBtn) {
+        pauseBtn.addEventListener('click', () => {
+          if (window.speechSynthesis.paused) {
+            window.speechSynthesis.resume();
+            pauseBtn.textContent = '⏸ Pause';
+          } else {
+            window.speechSynthesis.pause();
+            pauseBtn.textContent = '▶ Resume';
+          }
+        });
+      }
+
+      if (stopBtn) {
+        stopBtn.addEventListener('click', () => {
+          stopStoryVoice();
+          storyControlsContainer.innerHTML = `<span>⏹ Narration stopped.</span>`;
+        });
+      }
+    }
+
+    activeSpeechUtterance.onend = () => {
+      isVoiceSpeaking = false;
+      if (storyControlsContainer) {
+        storyControlsContainer.innerHTML = `<span>✓ Voice narration complete.</span>`;
+      }
+    };
+
+    activeSpeechUtterance.onerror = () => {
+      isVoiceSpeaking = false;
+    };
+
+    window.speechSynthesis.speak(activeSpeechUtterance);
+  }
+
+  function stopStoryVoice() {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    isVoiceSpeaking = false;
+  }
+
+  function typewriteAssistantResponse(htmlContent, plainText, isStory = false) {
     const feed = document.getElementById('aiChatFeed');
     if (!feed) return;
 
@@ -676,9 +668,9 @@
     const msgEl = document.createElement('div');
     msgEl.className = 'ai-msg assistant';
     msgEl.innerHTML = `
-      <div class="ai-msg-sender">✦ Evidex AI Assistant</div>
       <div class="ai-msg-bubble">
-        <span class="ai-text-container"></span><span class="ai-typewriter-cursor"></span>
+        <div class="ai-text-container"></div><span class="ai-typewriter-cursor"></span>
+        ${isStory ? '<div class="ai-story-voice-bar" id="aiStoryControls"></div>' : ''}
       </div>
     `;
     feed.appendChild(msgEl);
@@ -686,14 +678,13 @@
 
     const textContainer = msgEl.querySelector('.ai-text-container');
     const cursor = msgEl.querySelector('.ai-typewriter-cursor');
+    const storyControls = msgEl.querySelector('#aiStoryControls');
 
-    // Typewriter character by character
     let i = 0;
-    const speed = 18; // ms per char
+    const speed = isStory ? 10 : 16; // Faster for long stories
 
     if (typewriterInterval) clearInterval(typewriterInterval);
 
-    // Fast-skip on click
     msgEl.addEventListener('click', () => {
       if (typewriterInterval) {
         clearInterval(typewriterInterval);
@@ -701,6 +692,7 @@
         textContainer.innerHTML = htmlContent;
         if (cursor) cursor.remove();
         feed.scrollTop = feed.scrollHeight;
+        if (isStory && isSoundEnabled) speakStoryText(plainText, storyControls);
       }
     });
 
@@ -713,30 +705,50 @@
       } else {
         clearInterval(typewriterInterval);
         typewriterInterval = null;
-        // Inject rich formatted HTML once typing completes
         textContainer.innerHTML = htmlContent;
         if (cursor) cursor.remove();
         feed.scrollTop = feed.scrollHeight;
 
-        // Optional speech synthesis read aloud
-        if (isSoundEnabled && window.speechSynthesis) {
-          try {
-            window.speechSynthesis.cancel();
-            const utter = new SpeechSynthesisUtterance(plainText.replace(/[#*`_]/g, ''));
-            utter.rate = 1.05;
-            utter.pitch = 1.0;
-            window.speechSynthesis.speak(utter);
-          } catch (e) {}
+        // Auto-start voice narration for story or answer
+        if (isSoundEnabled) {
+          if (isStory) {
+            speakStoryText(plainText, storyControls);
+          } else if (window.speechSynthesis) {
+            try {
+              window.speechSynthesis.cancel();
+              const utter = new SpeechSynthesisUtterance(plainText.replace(/[#*`_]/g, ''));
+              utter.rate = 1.05;
+              window.speechSynthesis.speak(utter);
+            } catch (e) {}
+          }
         }
       }
     }, speed);
   }
 
-  // ── SMART CASE KNOWLEDGE ENGINE ──
+  // ── SMART CASE KNOWLEDGE ENGINE & STORYTELLING ──
   async function generateAIAnswer(query) {
     const q = (query || '').toLowerCase().trim();
 
-    // Fetch live cases from epsApi if available
+    // 1. STORYTELLING REQUEST (Last Case Registered)
+    if (q.includes('story') || q.includes('last case') || q.includes('recent case') || q.includes('registered case') || q.includes('explain the case')) {
+      try {
+        if (window.epsApi && typeof window.epsApi.analyzeCaseStory === 'function') {
+          const res = await window.epsApi.analyzeCaseStory();
+          if (res && res.success) {
+            return {
+              isStory: true,
+              plain: res.storyPlain,
+              html: res.storyHtml
+            };
+          }
+        }
+      } catch (e) {
+        console.warn('Backend story analysis error:', e);
+      }
+    }
+
+    // Fetch live cases
     let cases = [];
     try {
       if (window.epsApi && typeof window.epsApi.getCases === 'function') {
@@ -748,10 +760,11 @@
       console.warn('AI could not fetch live cases:', e);
     }
 
-    // 1. Cases Summary Query
+    // 2. Summary query
     if (q.includes('all cases') || q.includes('summarize') || q.includes('summary') || q.includes('how many cases')) {
       if (cases.length === 0) {
         return {
+          isStory: false,
           plain: "There are currently 0 registered cases in the Evidex decentralized ledger. You can register a new FIR case from the 'Register Case' tab in the left sidebar.",
           html: "There are currently <strong>0 registered cases</strong> in the Evidex decentralized ledger.<br><br>You can register a new FIR case from the <strong>Register Case</strong> option in the left navigation sidebar."
         };
@@ -761,6 +774,7 @@
       const recent = cases.slice(0, 3).map(c => `• <strong>${escapeHtml(c.case_number || c.fir_number || 'Case')}</strong>: ${escapeHtml(c.title || 'Evidence Dossier')} (${c.status || 'Active'})`).join('<br>');
 
       return {
+        isStory: false,
         plain: `Found ${cases.length} total cases in the Evidex ledger. ${pendingForensics} are under forensic analysis, and ${courtCases} are prepared for court presentation.\n\nRecent dossiers:\n${cases.slice(0, 3).map(c => `- ${c.case_number || c.fir_number}: ${c.title} (${c.status})`).join('\n')}`,
         html: `Found <strong>${cases.length} registered case dossiers</strong> in the cryptographic ledger:<br><br>
                📊 <strong>Status Breakdown:</strong><br>
@@ -770,27 +784,30 @@
       };
     }
 
-    // 2. Forensic Status Query
+    // 3. Forensic Status Query
     if (q.includes('forensic') || q.includes('lab') || q.includes('fsl') || q.includes('report')) {
       const fslCases = cases.filter(c => c.status === 'UNDER_FORENSIC_ANALYSIS' || c.status === 'FORENSIC_REQUESTED' || c.has_forensics_report);
       if (fslCases.length === 0) {
         return {
+          isStory: false,
           plain: "No cases are currently flagged for forensic lab examination. When registering a case, police officers can check 'Request Forensics Report' to schedule evidence analysis.",
           html: "No cases are currently pending forensic lab examination.<br><br>💡 <em>Officer Tip:</em> When registering an FIR, check the <strong>'Request Forensics Report'</strong> checkbox to flag digital evidence for FSL laboratory analysis."
         };
       }
-      const list = fslCases.slice(0, 4).map(c => `• <strong>${escapeHtml(c.case_number || c.fir_number)}</strong>: ${escapeHtml(c.title)} &mdash; Status: <span style="color:#f59e0b;">${c.status}</span>`).join('<br>');
+      const list = fslCases.slice(0, 4).map(c => `• <strong>${escapeHtml(c.case_number || c.fir_number)}</strong>: ${escapeHtml(c.title)} &mdash; Status: <span style="color:#2563eb; font-weight:600;">${c.status}</span>`).join('<br>');
       return {
+        isStory: false,
         plain: `There are ${fslCases.length} case(s) involving forensic reports in the ledger.`,
         html: `Found <strong>${fslCases.length} case(s)</strong> with forensic requirements:<br><br>${list}<br><br>Forensic specialists can accept custody, perform hash verification, and upload certified reports.`
       };
     }
 
-    // 3. Chain of Custody Query
+    // 4. Chain of Custody Query
     if (q.includes('custody') || q.includes('chain') || q.includes('integrity') || q.includes('tamper')) {
       return {
+        isStory: false,
         plain: "Evidex secures evidence custody using SHA-256 cryptographic hashing and Ethereum Sepolia smart contracts. Every custody transfer is signed with MetaMask, creating an immutable, court-admissible audit trail.",
-        html: `⚖️ <strong>Chain of Custody & Tamper Verification:</strong><br><br>
+        html: `⚖️ <strong>Chain of Custody &amp; Tamper Verification:</strong><br><br>
                1. <strong>Cryptographic Fingerprint:</strong> Digital evidence is hashed client-side with SHA-256 before upload.<br>
                2. <strong>Smart Contract Anchoring:</strong> The hash, officer ID, and timestamp are written directly to the Ethereum blockchain.<br>
                3. <strong>Custody Transfers:</strong> When custody moves between Police, Forensic Labs, and Court, both parties sign the transfer transaction.<br>
@@ -798,27 +815,15 @@
       };
     }
 
-    // 4. Case Registration Guide
-    if (q.includes('register') || q.includes('how to') || q.includes('new case')) {
-      return {
-        plain: "To register a case: 1. Click 'Register Case' in the left menu. 2. Enter Case Title, FIR Number, Section of Law, and Description. 3. Check 'Request Forensics Report' if lab analysis is required. 4. Upload digital evidence files. 5. Sign with your MetaMask wallet.",
-        html: `📋 <strong>Case Registration Workflow:</strong><br><br>
-               1. Select <strong>'Register Case'</strong> from the translucent left sidebar.<br>
-               2. Fill in the FIR Number, Acts/Sections, and Incident Summary.<br>
-               3. Select <strong>'Request Forensics Report'</strong> if physical or digital evidence requires FSL inspection.<br>
-               4. Upload evidence media (PDF, video, audio, disk images).<br>
-               5. Confirm with your authorized MetaMask wallet to mint the immutable record on Ethereum.`
-      };
-    }
-
-    // 5. General intelligent response
+    // 5. Default intelligent response
     return {
-      plain: `Understood, Officer. Evidex is operating with live Ethereum smart contracts and AES-256 client encryption. You can query case files, check pending lab verifications, or inspect chain of custody logs at any time.`,
-      html: `Understood, Officer. <strong>Evidex v2.4</strong> is active.<br><br>
+      isStory: false,
+      plain: `Understood, Officer. Evidex is operating with live Ethereum smart contracts and AES-256 client encryption. You can ask for a full story of the last registered case, query dossiers, or inspect chain of custody logs.`,
+      html: `Understood, Officer. <strong>Evidex AI</strong> is ready.<br><br>
              &bull; <strong>Blockchain Network:</strong> Ethereum Sepolia<br>
              &bull; <strong>Storage Node:</strong> Pinata IPFS Decentralized Cluster<br>
              &bull; <strong>Active Cases:</strong> ${cases.length} registered dossiers<br><br>
-             Try asking: <em>"Summarize all cases"</em>, <em>"Forensic reports"</em>, or <em>"How does custody work?"</em>`
+             Try asking: <em>"Story of the last case"</em>, <em>"Summarize all cases"</em>, or <em>"How does custody work?"</em>`
     };
   }
 
@@ -830,15 +835,14 @@
     const input = document.getElementById('aiPromptInput');
     if (input) input.value = '';
 
-    // Append user question
+    stopStoryVoice();
     appendUserMessage(text);
 
-    // 1. Switch Avatar to THINKING ANIMATION (Colorful rotating rings from video!)
+    // 1. Switch Avatar to THINKING ANIMATION
     setState('thinking');
     showThinkingIndicator();
 
-    // Simulate cryptographic processing / API delay (1.8s - 2.5s)
-    const delay = 1800 + Math.random() * 700;
+    const delay = 1600 + Math.random() * 600;
     const answer = await new Promise(resolve => {
       setTimeout(async () => {
         const res = await generateAIAnswer(text);
@@ -846,12 +850,12 @@
       }, delay);
     });
 
-    // 2. Switch Avatar to NOTIFICATION ANIMATION (Blue dot animation from video!)
+    // 2. Switch Avatar to NOTIFICATION ANIMATION (Blue dot)
     setState('notification');
 
-    // 3. Render answer in dialogue box with typewriter effect
+    // 3. Render answer in dialogue box with typewriter effect & voice
     setTimeout(() => {
-      typewriteAssistantResponse(answer.html, answer.plain);
+      typewriteAssistantResponse(answer.html, answer.plain, answer.isStory);
     }, 400);
   }
 
@@ -891,8 +895,7 @@
       }
     };
 
-    recognition.onerror = (event) => {
-      console.warn('Speech recognition error:', event.error);
+    recognition.onerror = () => {
       stopVoiceRecognition();
     };
 
@@ -925,13 +928,11 @@
 
   // ── EVENT LISTENERS ──
   function attachEventListeners() {
-    // Mouse tracking for avatar eyes
     window.addEventListener('mousemove', (e) => {
       mouse.x = e.clientX;
       mouse.y = e.clientY;
     }, { passive: true });
 
-    // Avatar hover & click
     const anchor = document.getElementById('aiAvatarAnchor');
     if (anchor) {
       anchor.addEventListener('mouseenter', () => {
@@ -946,7 +947,6 @@
       });
     }
 
-    // Close button
     const closeBtn = document.getElementById('aiCloseBoxBtn');
     if (closeBtn) {
       closeBtn.addEventListener('click', (e) => {
@@ -955,20 +955,18 @@
       });
     }
 
-    // Audio toggle button
     const audioBtn = document.getElementById('aiAudioToggleBtn');
     if (audioBtn) {
       audioBtn.addEventListener('click', () => {
         isSoundEnabled = !isSoundEnabled;
         audioBtn.classList.toggle('active', isSoundEnabled);
         audioBtn.innerHTML = isSoundEnabled ? '🔊' : '🔇';
-        if (!isSoundEnabled && window.speechSynthesis) {
-          window.speechSynthesis.cancel();
+        if (!isSoundEnabled) {
+          stopStoryVoice();
         }
       });
     }
 
-    // Send button & Enter key
     const sendBtn = document.getElementById('aiSendBtn');
     const input = document.getElementById('aiPromptInput');
 
@@ -985,7 +983,6 @@
       });
     }
 
-    // Voice button
     const voiceBtn = document.getElementById('aiVoiceBtn');
     if (voiceBtn) {
       voiceBtn.addEventListener('click', () => {
@@ -1002,7 +999,6 @@
       cancelVoiceBtn.addEventListener('click', stopVoiceRecognition);
     }
 
-    // Action chips (Game dialogue options)
     const suggestionsBar = document.getElementById('aiSuggestionsBar');
     if (suggestionsBar) {
       suggestionsBar.addEventListener('click', (e) => {
@@ -1014,27 +1010,14 @@
       });
     }
 
-    // Close on outside click
     document.addEventListener('click', (e) => {
       const widget = document.getElementById('evidexAiWidget');
       if (isBoxOpen && widget && !widget.contains(e.target)) {
         closeDialogueBox();
       }
     });
-
-    // Idle hint timer (pops up gently after 7s to invite user)
-    setTimeout(() => {
-      const hint = document.getElementById('aiIdleHint');
-      if (hint && !isBoxOpen) {
-        hint.classList.add('visible');
-        setTimeout(() => {
-          if (!mouse.isOverAvatar) hint.classList.remove('visible');
-        }, 5000);
-      }
-    }, 7000);
   }
 
-  // Utility helper
   function escapeHtml(str) {
     if (!str) return '';
     return String(str)
@@ -1053,7 +1036,6 @@
     const landing = document.getElementById('landingPage');
     const app = document.getElementById('appContent');
 
-    // On starting page: landingPage is visible, or appContent is hidden
     const isLandingVisible = landing && (landing.style.display !== 'none' && window.getComputedStyle(landing).display !== 'none');
     const isAppVisible = app && (app.style.display !== 'none' && window.getComputedStyle(app).display !== 'none');
 
@@ -1068,10 +1050,8 @@
   }
 
   function setupVisibilityObserver() {
-    // Initial check
     updateAiWidgetVisibility();
 
-    // Observe changes to landingPage and appContent display/style
     const landing = document.getElementById('landingPage');
     const app = document.getElementById('appContent');
 
@@ -1086,7 +1066,6 @@
       observer.observe(app, { attributes: true, attributeFilter: ['style', 'class'] });
     }
 
-    // Also listen to navigation changes
     window.addEventListener('popstate', updateAiWidgetVisibility);
     window.addEventListener('hashchange', updateAiWidgetVisibility);
   }
@@ -1099,7 +1078,6 @@
     attachEventListeners();
     setupVisibilityObserver();
 
-    // Expose for testing & integration
     window.evidexAi = {
       setState,
       open: openDialogueBox,

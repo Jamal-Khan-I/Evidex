@@ -261,6 +261,56 @@
       } catch (err) {
         return { success: false, users: [], count: 0, error: err.message };
       }
+    },
+
+    // Admin API Keys configuration
+    async getAdminApiKeys() {
+      try {
+        const res = await fetch(`${API_BASE}/admin/api-keys`);
+        return await res.json();
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+    },
+
+    async saveAdminApiKeys(payload) {
+      try {
+        const res = await fetch(`${API_BASE}/admin/api-keys`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        return await res.json();
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+    },
+
+    async testApiKey(key, provider = 'gemini') {
+      try {
+        const res = await fetch(`${API_BASE}/ai/test-key`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key, provider })
+        });
+        return await res.json();
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+    },
+
+    // AI Case Story analysis & generation
+    async analyzeCaseStory(caseNumber) {
+      try {
+        const res = await fetch(`${API_BASE}/ai/analyze-case`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ caseNumber })
+        });
+        return await res.json();
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
     }
   };
 

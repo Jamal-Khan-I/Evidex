@@ -71,4 +71,195 @@ router.use('/profile', profileRoutes);
 router.use('/auth', authRoutes);
 router.use('/cases', casesRoutes);
 
+// ── ADMIN API KEYS CONFIGURATION ──
+router.get('/admin/api-keys', (req, res) => {
+  try {
+    const geminiRow = db.get("SELECT value FROM system_settings WHERE key = 'gemini_api_key'");
+    const openaiRow = db.get("SELECT value FROM system_settings WHERE key = 'openai_api_key'");
+    const geminiKey = (geminiRow ? geminiRow.value : '') || process.env.GEMINI_API_KEY || '';
+    const openaiKey = (openaiRow ? openaiRow.value : '') || process.env.OPENAI_API_KEY || '';
+    res.json({
+      success: true,
+      geminiApiKey: geminiKey,
+      openaiApiKey: openaiKey,
+      hasGemini: !!geminiKey,
+      hasOpenai: !!openaiKey
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/admin/api-keys', (req, res) => {
+  try {
+    const { geminiApiKey, openaiApiKey } = req.body;
+    const now = new Date().toISOString();
+    if (geminiApiKey !== undefined) {
+      db.run("INSERT OR REPLACE INTO system_settings (key, value, updated_at) VALUES ('gemini_api_key', ?, ?)", [geminiApiKey.trim(), now]);
+      process.env.GEMINI_API_KEY = geminiApiKey.trim();
+    }
+    if (openaiApiKey !== undefined) {
+      db.run("INSERT OR REPLACE INTO system_settings (key, value, updated_at) VALUES ('openai_api_key', ?, ?)", [openaiApiKey.trim(), now]);
+      process.env.OPENAI_API_KEY = openaiApiKey.trim();
+    }
+    res.json({ success: true, message: 'API keys saved successfully.' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/ai/test-key', async (req, res) => {
+  try {
+    const { key, provider } = req.body;
+    if (!key) return res.status(400).json({ success: false, error: 'API key is required' });
+
+    if (provider === 'gemini' || !provider) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(key.trim())}`;
+      const apiRes = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: 'Respond with exactly: OK' }] }]
+        })
+      });
+      const data = await apiRes.json();
+      if (apiRes.ok) {
+        return res.json({ success: true, message: 'Google Gemini connection verified successfully!' });
+      } else {
+        return res.status(400).json({ success: false, error: data.error?.message || 'Invalid Gemini API key' });
+      }
+    } else {
+      const apiRes = await fetch('https://api.openai.com/v1/models', {
+        headers: { 'Authorization': `Bearer ${key.trim()}` }
+      });
+      if (apiRes.ok) {
+        return res.json({ success: true, message: 'OpenAI connection verified successfully!' });
+      } else {
+        return res.status(400).json({ success: false, error: 'Invalid OpenAI API key' });
+      }
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── AI CASE STORY ANALYSIS ──
+router.post('/ai/analyze-case', async (req, res) => {
+  try {
+    const { caseNumber } = req.body;
+    let targetCase = null;
+    if (caseNumber) {
+      targetCase = db.get("SELECT * FROM cases WHERE case_number = ? OR fir_number = ?", [caseNumber, caseNumber]);
+    }
+    if (!targetCase) {
+      targetCase = db.get("SELECT * FROM cases ORDER BY rowid DESC LIMIT 1");
+    }
+    if (!targetCase) {
+      return res.json({
+        success: false,
+        storyHtml: "No cases are currently registered in the Evidex decentralized ledger. Once an officer files an FIR and seals digital evidence, I can narrate the complete investigative dossier from start to end.",
+        storyPlain: "No cases are currently registered in the Evidex decentralized ledger."
+      });
+    }
+
+    const evidenceList = db.all("SELECT * FROM evidence_records WHERE case_number = ?", [targetCase.case_number]) || [];
+    const auditLogs = db.all("SELECT * FROM audit_logs WHERE case_number = ? ORDER BY id ASC", [targetCase.case_number]) || [];
+
+    const geminiRow = db.get("SELECT value FROM system_settings WHERE key = 'gemini_api_key'");
+    const apiKey = (geminiRow ? geminiRow.value : '') || process.env.GEMINI_API_KEY;
+
+    if (apiKey) {
+      try {
+        const prompt = `You are Evidex AI, an elite legal intelligence assistant and criminal forensic investigator.
+Explain and analyze the following case as a compelling, professional investigative story from start to end, detailing what happened, how digital evidence was seized, its cryptographic verification on the Ethereum blockchain, custody transfers, and the current legal status.
+
+CASE DOSSIER:
+- Case Number: ${targetCase.case_number}
+- FIR Number: ${targetCase.fir_number || 'N/A'}
+- Title: ${targetCase.title || 'Official Evidence Dossier'}
+- Incident / Description: ${targetCase.description || 'Digital evidence seizure and investigation'}
+- Police Station: ${targetCase.police_station || 'Tamil Nadu Police'}
+- Acts / Sections: ${targetCase.law_sections || 'BNS / IT Act'}
+- Registered By: ${targetCase.registered_by}
+- Registration Date: ${targetCase.created_at}
+- Status: ${targetCase.case_status || targetCase.status || 'Active'}
+- Evidence Items Seized (${evidenceList.length} items):
+${evidenceList.map((e, idx) => `  ${idx + 1}. ${e.file_name} (Hash: ${e.file_hash}, Size: ${e.file_size}B)`).join('\n') || '  No digital files attached.'}
+- Custody Trail:
+${auditLogs.map((a, idx) => `  ${idx + 1}. [${a.created_at}] Action: ${a.action}, Officer: ${a.wallet_address}`).join('\n') || '  Seizure recorded.'}
+
+REQUIREMENTS:
+1. Narrate the case like a captivating investigative story from start to end with clear chapter titles:
+   Chapter I: The Incident & Crime Report
+   Chapter II: Digital Evidence & Cryptographic Sealing
+   Chapter III: Chain of Custody & Forensic Trail
+   Chapter IV: Judicial Standing & Court Readiness
+2. Keep it factual to the evidence while maintaining an engaging, articulate, professional storytelling tone.
+3. Keep the narration concise (~250-320 words) so it is perfect for voice narration.`;
+
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
+        const aiRes = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { maxOutputTokens: 800, temperature: 0.7 }
+          })
+        });
+        const aiData = await aiRes.json();
+        if (aiRes.ok && aiData.candidates && aiData.candidates[0]?.content?.parts[0]?.text) {
+          const rawStory = aiData.candidates[0].content.parts[0].text;
+          const formattedHtml = rawStory
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/\n\n/g, '<br><br>')
+            .replace(/\n/g, '<br>');
+
+          return res.json({
+            success: true,
+            isAiGenerated: true,
+            caseNumber: targetCase.case_number,
+            title: targetCase.title || targetCase.description,
+            storyHtml: formattedHtml,
+            storyPlain: rawStory.replace(/[*#_]/g, '')
+          });
+        }
+      } catch (geminiErr) {
+        console.warn('Gemini API call failed, falling back to local story engine:', geminiErr);
+      }
+    }
+
+    // Local Storytelling Engine Fallback
+    const caseState = targetCase.case_status || targetCase.status || 'Active';
+    const isFslReq = targetCase.forensics_requested || targetCase.has_forensics_report;
+    const storyPlain = `Here is the investigative story of Case ${targetCase.case_number}, recorded under ${targetCase.fir_number || 'FIR'}.\n\nChapter I: The Incident and Crime Report.\nThe investigation officially commenced at ${targetCase.police_station || 'the police station'} under ${targetCase.law_sections || 'applicable penal provisions'}. The case was formally registered documenting: "${targetCase.description || 'Electronic evidence seized during active investigation.'}"\n\nChapter II: Digital Evidence and Cryptographic Sealing.\nLaw enforcement officers seized ${evidenceList.length} electronic evidence item(s). Every file was immediately computed for its cryptographic SHA-256 fingerprint on-device before upload. The primary hash was permanently written to the Ethereum Sepolia smart contract, rendering any future tampering mathematically impossible.\n\nChapter III: Chain of Custody and Forensic Examination.\nCustody of the evidence was transferred under digital signature to ${isFslReq ? 'the Forensic Science Laboratory for disk imaging and electronic analysis' : 'authorized departmental custody'}. All hand-to-hand transactions were timestamped and verified across ${auditLogs.length} logged blockchain actions.\n\nChapter IV: Judicial Standing and Court Presentation.\nThe case dossier currently holds status "${caseState}". With its cryptographic chain intact, it stands fully admissible under electronic evidence standards, prepared for judicial review.`;
+
+    const storyHtml = `📖 <strong>Investigative Story: Case ${targetCase.case_number}</strong><br>
+<span style="color:#64748b; font-size:11.5px;">Registered under ${targetCase.fir_number || 'FIR'} &bull; ${targetCase.police_station || 'Jurisdiction'}</span><br><br>
+
+<strong>Chapter I: The Incident & Crime Report</strong><br>
+The investigation formally opened with the filing of <strong>${targetCase.fir_number || 'FIR'}</strong> invoking <em>${targetCase.law_sections || 'BNS / IT Act'}</em>. The reported incident records: "${targetCase.description || 'Digital evidence seizure and criminal investigation.'}".<br><br>
+
+<strong>Chapter II: Digital Evidence & Cryptographic Sealing</strong><br>
+Officers impounded <strong>${evidenceList.length} electronic evidence item(s)</strong>. Every byte was hashed locally with SHA-256 and sealed on the Ethereum Sepolia blockchain ledger, preventing any retroactive tampering.<br><br>
+
+<strong>Chapter III: Chain of Custody & Forensic Trail</strong><br>
+The evidence trail records <strong>${auditLogs.length} verified custodial actions</strong>. Current standing: <span style="color:#2563eb; font-weight:600;">${caseState}</span>.<br><br>
+
+<strong>Chapter IV: Judicial Readiness</strong><br>
+The complete cryptographic dossier is locked and admissible under electronic judicial guidelines.`;
+
+    return res.json({
+      success: true,
+      isAiGenerated: false,
+      caseNumber: targetCase.case_number,
+      title: targetCase.title,
+      storyHtml,
+      storyPlain
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;

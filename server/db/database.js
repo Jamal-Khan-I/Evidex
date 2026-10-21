@@ -27,6 +27,9 @@ function initDatabase() {
     db.exec(schemaSql);
   }
 
+  // Ensure system_settings table exists for admin API keys
+  db.exec('CREATE TABLE IF NOT EXISTS system_settings (key TEXT PRIMARY KEY, value TEXT, updated_at TEXT);');
+
   // Safe migrations for preexisting tables
   try {
     const tableInfo = db.prepare("PRAGMA table_info(officer_profiles)").all();

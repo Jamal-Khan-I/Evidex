@@ -925,6 +925,17 @@ async function connectWallet() {
     if (!chainOk) return;
 
     provider = new ethers.providers.Web3Provider(ethProvider);
+    if (shouldPromptAccountSwitch && ethProvider && ethProvider.request) {
+      try {
+        await ethProvider.request({
+          method: 'wallet_requestPermissions',
+          params: [{ eth_accounts: {} }]
+        });
+      } catch (err) {
+        console.log("MetaMask account selector dismissed:", err.message);
+      }
+      shouldPromptAccountSwitch = false;
+    }
     await provider.send("eth_requestAccounts", []);
     signer = provider.getSigner();
 
@@ -1369,6 +1380,14 @@ function renderRoleSidebar(role) {
         title: "Evidex Personnel Directory",
         eyebrow: "State Administration · Approved Officer Roster",
         icon: `<svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`
+      },
+      {
+        id: "nav-admin-apikeys",
+        label: "API Keys",
+        panelId: "panel-admin-apikeys",
+        title: "AI Intelligence & API Configuration",
+        eyebrow: "State Administration · Intelligence Engine Keys",
+        icon: `<svg viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>`
       }
     ];
   }
@@ -1411,6 +1430,8 @@ function switchWorkspacePanel(panelId, title, eyebrow, btnId) {
     loadAdminUsersRoster();
   } else if (panelId === "panel-admin-requests") {
     loadAdminPendingCounter();
+  } else if (panelId === "panel-admin-apikeys") {
+    loadAdminApiKeysPanel();
   }
 }
 
@@ -2054,6 +2075,132 @@ async function loadAdminUsersRoster() {
     `;
   } catch (err) {
     container.innerHTML = `<div style="color:var(--color-danger); padding:20px;">Failed to load roster: ${err.message}</div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ADMIN API KEYS CONTROLLER
+// ═══════════════════════════════════════════════════════════════════
+async function loadAdminApiKeysPanel() {
+  const geminiInput = document.getElementById("adminGeminiApiKey");
+  const openaiInput = document.getElementById("adminOpenaiApiKey");
+  const badge = document.getElementById("aiKeyStatusBadge");
+  const notice = document.getElementById("adminApiKeySaveNotice");
+  if (notice) notice.innerHTML = "";
+
+  try {
+    const res = await window.epsApi.getAdminApiKeys();
+    if (res && res.success) {
+      if (geminiInput) geminiInput.value = res.geminiApiKey || localStorage.getItem("evidex_gemini_api_key") || "";
+      if (openaiInput) openaiInput.value = res.openaiApiKey || localStorage.getItem("evidex_openai_api_key") || "";
+      if (badge) {
+        if (res.hasGemini || geminiInput?.value) {
+          badge.style.display = "inline-block";
+          badge.className = "badge-status-approved";
+          badge.textContent = "Gemini AI Active";
+        } else {
+          badge.style.display = "none";
+        }
+      }
+    }
+  } catch (e) {
+    if (geminiInput) geminiInput.value = localStorage.getItem("evidex_gemini_api_key") || "";
+  }
+}
+
+function toggleApiKeyVisibility(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  if (input.type === "password") {
+    input.type = "text";
+    if (btn) btn.textContent = "Hide";
+  } else {
+    input.type = "password";
+    if (btn) btn.textContent = "Show";
+  }
+}
+
+async function saveAdminApiKeys() {
+  const geminiInput = document.getElementById("adminGeminiApiKey");
+  const openaiInput = document.getElementById("adminOpenaiApiKey");
+  const notice = document.getElementById("adminApiKeySaveNotice");
+  const badge = document.getElementById("aiKeyStatusBadge");
+
+  const geminiApiKey = (geminiInput?.value || "").trim();
+  const openaiApiKey = (openaiInput?.value || "").trim();
+
+  if (geminiApiKey) localStorage.setItem("evidex_gemini_api_key", geminiApiKey);
+  else localStorage.removeItem("evidex_gemini_api_key");
+
+  if (openaiApiKey) localStorage.setItem("evidex_openai_api_key", openaiApiKey);
+  else localStorage.removeItem("evidex_openai_api_key");
+
+  try {
+    if (notice) {
+      notice.style.color = "#2563eb";
+      notice.textContent = "Saving API keys to database...";
+    }
+    const res = await window.epsApi.saveAdminApiKeys({ geminiApiKey, openaiApiKey });
+    if (res && res.success) {
+      if (notice) {
+        notice.style.color = "#16a34a";
+        notice.textContent = "✓ API Keys saved successfully! Evidex AI is now supercharged.";
+      }
+      if (badge && geminiApiKey) {
+        badge.style.display = "inline-block";
+        badge.className = "badge-status-approved";
+        badge.textContent = "Gemini AI Active";
+      }
+    } else {
+      if (notice) {
+        notice.style.color = "#dc2626";
+        notice.textContent = "Failed to save: " + (res?.error || "Unknown error");
+      }
+    }
+  } catch (err) {
+    if (notice) {
+      notice.style.color = "#16a34a";
+      notice.textContent = "✓ API Keys saved to local session.";
+    }
+  }
+}
+
+async function testAdminApiKey() {
+  const geminiInput = document.getElementById("adminGeminiApiKey");
+  const notice = document.getElementById("adminApiKeySaveNotice");
+  const key = (geminiInput?.value || "").trim() || localStorage.getItem("evidex_gemini_api_key") || "";
+
+  if (!key) {
+    if (notice) {
+      notice.style.color = "#dc2626";
+      notice.textContent = "Please enter a Gemini API Key first.";
+    }
+    return;
+  }
+
+  if (notice) {
+    notice.style.color = "#2563eb";
+    notice.textContent = "Testing Gemini connection...";
+  }
+
+  try {
+    const res = await window.epsApi.testApiKey(key, 'gemini');
+    if (res && res.success) {
+      if (notice) {
+        notice.style.color = "#16a34a";
+        notice.textContent = "✓ Connection Verified! Google Gemini model responded successfully.";
+      }
+    } else {
+      if (notice) {
+        notice.style.color = "#dc2626";
+        notice.textContent = "Connection test failed: " + (res?.error || "Invalid key");
+      }
+    }
+  } catch (err) {
+    if (notice) {
+      notice.style.color = "#dc2626";
+      notice.textContent = "Test error: " + err.message;
+    }
   }
 }
 
@@ -4753,7 +4900,10 @@ let verifiedAadhaarData = null;
 let isWalletAddressFormatValid = false;
 
 // ── LOGOUT / RESET ──
+let shouldPromptAccountSwitch = false;
+
 function logoutAccount() {
+  shouldPromptAccountSwitch = true;
   provider = null;
   signer = null;
   contract = null;

@@ -676,6 +676,70 @@
         </div>
       </div>
 
+      <!-- PANEL 13: ADMIN - API KEYS CONFIGURATION -->
+      <div class="workspace-panel" id="panel-admin-apikeys">
+        <div class="panel-card">
+          <div class="card-head flex-between">
+            <div>
+              <h2>AI Intelligence &amp; API Configuration</h2>
+              <p class="card-subtitle">Configure Google Gemini &amp; external LLM API keys to power deep case analysis, timeline reconstruction, and storytelling narration in Evidex AI.</p>
+            </div>
+            <div id="aiKeyStatusBadge" class="badge-status-approved" style="display:none; padding: 6px 12px; font-size:12px;">
+              Gemini Active
+            </div>
+          </div>
+
+          <div style="margin-top: 24px; display: flex; flex-direction: column; gap: 20px;">
+            <!-- Google Gemini API Key Section -->
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <label for="adminGeminiApiKey" style="font-size: 13.5px; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 18px;">✨</span> Google Gemini API Key
+                  <span style="font-size: 11px; background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 10px; font-weight: 600;">Recommended for Storytelling</span>
+                </label>
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" style="font-size: 12px; color: #2563eb; text-decoration: none; font-weight: 600;">
+                  Get free key at Google AI Studio &rarr;
+                </a>
+              </div>
+              <p style="font-size: 12.5px; color: #64748b; margin-bottom: 12px; line-height: 1.5;">
+                Powers Evidex AI to analyze registered case dossiers, reconstruct multi-chapter investigative stories from start to end, and provide spoken briefings.
+              </p>
+              <div style="display: flex; gap: 10px;">
+                <input type="password" id="adminGeminiApiKey" placeholder="AIzaSy..." style="flex: 1; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-family: monospace; font-size: 13px;" />
+                <button type="button" class="btn-secondary" onclick="toggleApiKeyVisibility('adminGeminiApiKey', this)" style="padding: 0 14px;">Show</button>
+              </div>
+            </div>
+
+            <!-- Optional OpenAI API Key Section -->
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <label for="adminOpenaiApiKey" style="font-size: 13.5px; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 18px;">⚡</span> OpenAI API Key (Optional Fallback)
+                </label>
+              </div>
+              <p style="font-size: 12.5px; color: #64748b; margin-bottom: 12px; line-height: 1.5;">
+                Optional secondary intelligence provider for case cross-examination and anomaly explanations.
+              </p>
+              <div style="display: flex; gap: 10px;">
+                <input type="password" id="adminOpenaiApiKey" placeholder="sk-..." style="flex: 1; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-family: monospace; font-size: 13px;" />
+                <button type="button" class="btn-secondary" onclick="toggleApiKeyVisibility('adminOpenaiApiKey', this)" style="padding: 0 14px;">Show</button>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div style="display: flex; gap: 12px; align-items: center; margin-top: 6px;">
+              <button type="button" class="btn-primary" onclick="saveAdminApiKeys()" style="background: #2563eb; color: #ffffff; padding: 10px 24px; border-radius: 8px; font-weight: 700; cursor: pointer;">
+                Save API Keys
+              </button>
+              <button type="button" class="btn-secondary" onclick="testAdminApiKey()" style="padding: 10px 18px; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                Test Connection
+              </button>
+              <span id="adminApiKeySaveNotice" style="font-size: 12.5px; font-weight: 600; margin-left: 8px;"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 </main> <!-- /appContent -->
