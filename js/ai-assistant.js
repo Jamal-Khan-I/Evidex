@@ -160,11 +160,8 @@
               <div class="portrait-eye"></div>
               <div class="portrait-eye"></div>
             </div>
-            <div class="ai-header-info" style="display:flex; align-items:center; gap:8px;">
+            <div class="ai-header-info">
               <span class="ai-speaker-name">EVIDEX AI</span>
-              <button type="button" id="aiPlayJarvisSampleBtn" title="Play Iron Man J.A.R.V.I.S. Voice Sample" style="background:#f1f5f9; border:1px solid #cbd5e1; color:#0f172a; font-size:11px; font-weight:700; border-radius:12px; padding:2px 8px; cursor:pointer; display:inline-flex; align-items:center; gap:4px; transition:all 0.2s ease;">
-                ▶ J.A.R.V.I.S. Voice
-              </button>
             </div>
           </div>
           <div class="ai-header-controls">
@@ -181,9 +178,9 @@
         <div class="ai-dialogue-body" id="aiChatFeed">
           <div class="ai-msg assistant">
             <div class="ai-msg-bubble">
-              Welcome home, sir. I am your <strong>Evidex Case Intelligence Assistant</strong>, standing by with full J.A.R.V.I.S. voice telemetry. I monitor blockchain case dossiers, tamper audits, forensic lab reports, and custody transfers.
+              Greetings, Officer. I am your <strong>Evidex Case Intelligence Assistant</strong>. I monitor blockchain case dossiers, tamper audits, forensic lab reports, and custody transfers under Indian evidentiary standards.
               <br><br>
-              Ask me to explain the last registered case, summarize dossiers, or inspect chain of custody.
+              Ask me to explain the latest registered case, summarize dossiers, or inspect chain of custody.
             </div>
           </div>
         </div>
@@ -591,26 +588,16 @@
     if (thinkingEl) thinkingEl.remove();
   }
 
-  // ── J.A.R.V.I.S. VOICE SPEECH SYSTEM ──
-  let jarvisAudioPlayer = null;
-  let jarvisSampleAudio = null;
+  // ── EVIDEX AI INDIAN ENGLISH VOICE SYSTEM ──
+  let aiVoiceAudioPlayer = null;
 
-  function stopJarvisVoice() {
-    if (jarvisAudioPlayer) {
+  function stopAiVoice() {
+    if (aiVoiceAudioPlayer) {
       try {
-        jarvisAudioPlayer.pause();
-        jarvisAudioPlayer.currentTime = 0;
+        aiVoiceAudioPlayer.pause();
+        aiVoiceAudioPlayer.currentTime = 0;
       } catch (e) {}
-      jarvisAudioPlayer = null;
-    }
-    if (jarvisSampleAudio) {
-      try {
-        jarvisSampleAudio.pause();
-        jarvisSampleAudio.currentTime = 0;
-      } catch (e) {}
-      const sampleBtn = document.getElementById('aiPlayJarvisSampleBtn');
-      if (sampleBtn) sampleBtn.textContent = '▶ J.A.R.V.I.S. Voice';
-      jarvisSampleAudio = null;
+      aiVoiceAudioPlayer = null;
     }
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
@@ -618,101 +605,77 @@
     isVoiceSpeaking = false;
   }
 
-  function playJarvisSample() {
-    const sampleBtn = document.getElementById('aiPlayJarvisSampleBtn');
-    if (jarvisSampleAudio && !jarvisSampleAudio.paused) {
-      jarvisSampleAudio.pause();
-      jarvisSampleAudio.currentTime = 0;
-      jarvisSampleAudio = null;
-      if (sampleBtn) sampleBtn.textContent = '▶ J.A.R.V.I.S. Voice';
-      return;
-    }
-
-    stopJarvisVoice();
-    const audio = new Audio('/audio/jarvis-sample.mp3');
-    jarvisSampleAudio = audio;
-    if (sampleBtn) sampleBtn.textContent = '⏹ Playing...';
-
-    audio.onended = () => {
-      jarvisSampleAudio = null;
-      if (sampleBtn) sampleBtn.textContent = '▶ J.A.R.V.I.S. Voice';
-    };
-    audio.onerror = () => {
-      jarvisSampleAudio = null;
-      if (sampleBtn) sampleBtn.textContent = '▶ J.A.R.V.I.S. Voice';
-    };
-    audio.play().catch(e => {
-      console.warn('Could not auto-play Jarvis sample:', e);
-      if (sampleBtn) sampleBtn.textContent = '▶ J.A.R.V.I.S. Voice';
-    });
-  }
-
-  function getJarvisSpeechVoice() {
+  function getIndianSpeechVoice() {
     if (!('speechSynthesis' in window)) return null;
-    const voices = window.speechSynthesis.getVoices();
+    const voices = window.speechSynthesis.getVoices() || [];
     if (!voices || voices.length === 0) return null;
 
-    // 1. Natural British Voices (Ryan, George, Oliver, Daniel)
-    const britishNatural = voices.find(v => 
-      (v.lang.startsWith('en-GB') || v.lang.startsWith('en_GB') || v.lang.startsWith('en-UK')) && 
-      (v.name.includes('Ryan') || v.name.includes('George') || v.name.includes('Oliver') || v.name.includes('Daniel') || v.name.includes('Natural') || v.name.includes('Male'))
+    // 1. Natural Indian English voices (Microsoft Ravi, Heera, Neerja, Google English India)
+    const indianVoice = voices.find(v => 
+      (v.lang === 'en-IN' || v.lang.startsWith('en-IN') || v.lang.startsWith('en_IN')) &&
+      (v.name.includes('Ravi') || v.name.includes('Heera') || v.name.includes('Neerja') || v.name.includes('India'))
     );
-    if (britishNatural) return britishNatural;
+    if (indianVoice) return indianVoice;
 
-    // 2. Any British English voice
-    const anyBritish = voices.find(v => v.lang.startsWith('en-GB') || v.lang.startsWith('en_GB') || v.lang.startsWith('en-UK'));
-    if (anyBritish) return anyBritish;
+    // 2. Any en-IN voice
+    const anyIndian = voices.find(v => v.lang === 'en-IN' || v.lang.startsWith('en-IN') || v.lang.startsWith('en_IN'));
+    if (anyIndian) return anyIndian;
 
-    // 3. Natural / Google English voices
+    // 3. Clear Natural English voices
     const naturalEn = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('David')));
     return naturalEn || voices.find(v => v.lang.startsWith('en')) || voices[0];
   }
 
-  async function speakJarvisText(plainText, onEnd = null) {
+  async function speakAssistantVoice(plainText, onEnd = null) {
     if (!isSoundEnabled) return;
-    stopJarvisVoice();
+    stopAiVoice();
 
     const cleanText = plainText.replace(/[*#_`]/g, '').trim();
     if (!cleanText) return;
 
-    // Try high-fidelity neural J.A.R.V.I.S. TTS first (up to 650 characters)
+    // Try high-fidelity server-side neural Indian English TTS first (up to 650 characters)
     if (cleanText.length <= 650) {
       try {
-        const res = await window.epsApi.generateJarvisTts(cleanText);
-        if (res && res.success && res.audioUrl) {
-          isVoiceSpeaking = true;
-          const audio = new Audio(res.audioUrl);
-          jarvisAudioPlayer = audio;
-          audio.onended = () => {
-            isVoiceSpeaking = false;
-            jarvisAudioPlayer = null;
-            if (onEnd) onEnd();
-          };
-          audio.onerror = () => {
-            jarvisAudioPlayer = null;
-            fallbackWebSpeechJarvis(cleanText, onEnd);
-          };
-          await audio.play();
-          return;
+        const ttsFn = (window.epsApi && window.epsApi.generateIndianTts)
+          ? window.epsApi.generateIndianTts
+          : (window.epsApi && window.epsApi.generateJarvisTts);
+        if (typeof ttsFn === 'function') {
+          const res = await ttsFn(cleanText);
+          if (res && res.success && res.audioUrl) {
+            isVoiceSpeaking = true;
+            const audio = new Audio(res.audioUrl);
+            aiVoiceAudioPlayer = audio;
+            audio.onended = () => {
+              isVoiceSpeaking = false;
+              aiVoiceAudioPlayer = null;
+              if (onEnd) onEnd();
+            };
+            audio.onerror = () => {
+              aiVoiceAudioPlayer = null;
+              fallbackWebSpeechIndian(cleanText, onEnd);
+            };
+            await audio.play();
+            return;
+          }
         }
       } catch (err) {
-        // Fallback
+        // Fallback to client synthesis
       }
     }
 
-    fallbackWebSpeechJarvis(cleanText, onEnd);
+    fallbackWebSpeechIndian(cleanText, onEnd);
   }
 
-  function fallbackWebSpeechJarvis(cleanText, onEnd = null) {
+  function fallbackWebSpeechIndian(cleanText, onEnd = null) {
     if (!('speechSynthesis' in window)) return;
     try {
       window.speechSynthesis.cancel();
       const utter = new SpeechSynthesisUtterance(cleanText);
-      const voice = getJarvisSpeechVoice();
+      const voice = getIndianSpeechVoice();
       if (voice) utter.voice = voice;
-      // Natural, casual, articulate conversational cadence
+      // Clear, natural, articulate pronunciation (normal pitch 1.0, natural pace 1.0)
       utter.pitch = 1.0; 
-      utter.rate = 1.06;
+      utter.rate = 1.0;
       isVoiceSpeaking = true;
       activeSpeechUtterance = utter;
 
@@ -731,14 +694,14 @@
 
   function speakStoryText(plainText, storyControlsContainer) {
     if (!isSoundEnabled) return;
-    stopJarvisVoice();
+    stopAiVoice();
 
     const cleanText = plainText.replace(/[*#_]/g, '').trim();
     if (!cleanText) return;
 
     if (storyControlsContainer) {
       storyControlsContainer.innerHTML = `
-        <span>🔊 Speaking story in J.A.R.V.I.S. voice...</span>
+        <span>🔊 Narrating case with Evidex AI voice...</span>
         <div style="display:flex; gap:6px;">
           <button type="button" class="ai-voice-btn-pill" id="aiPauseStoryBtn">⏸ Pause</button>
           <button type="button" class="ai-voice-btn-pill danger" id="aiStopStoryBtn">⏹ Stop</button>
@@ -750,12 +713,12 @@
 
       if (pauseBtn) {
         pauseBtn.addEventListener('click', () => {
-          if (jarvisAudioPlayer) {
-            if (jarvisAudioPlayer.paused) {
-              jarvisAudioPlayer.play();
+          if (aiVoiceAudioPlayer) {
+            if (aiVoiceAudioPlayer.paused) {
+              aiVoiceAudioPlayer.play();
               pauseBtn.textContent = '⏸ Pause';
             } else {
-              jarvisAudioPlayer.pause();
+              aiVoiceAudioPlayer.pause();
               pauseBtn.textContent = '▶ Resume';
             }
           } else if (window.speechSynthesis) {
@@ -772,13 +735,13 @@
 
       if (stopBtn) {
         stopBtn.addEventListener('click', () => {
-          stopJarvisVoice();
+          stopAiVoice();
           storyControlsContainer.innerHTML = `<span>⏹ Narration stopped.</span>`;
         });
       }
     }
 
-    // Split story into natural paragraphs/sentences so each segment is synthesized via high-fidelity neural Jarvis TTS
+    // Split story into natural paragraphs/sentences so each segment is synthesized via high-fidelity neural Indian English TTS
     const paragraphs = cleanText.split(/\n+/).map(p => p.trim()).filter(Boolean);
     const chunks = [];
     for (const p of paragraphs) {
@@ -807,13 +770,13 @@
       if (chunkIdx >= chunks.length) {
         isVoiceSpeaking = false;
         if (storyControlsContainer) {
-          storyControlsContainer.innerHTML = `<span>✓ Story narration complete.</span>`;
+          storyControlsContainer.innerHTML = `<span>✓ Case narration complete.</span>`;
         }
         return;
       }
 
       const textToPlay = chunks[chunkIdx++];
-      await speakJarvisText(textToPlay, () => {
+      await speakAssistantVoice(textToPlay, () => {
         playNextChunk();
       });
     }
@@ -822,7 +785,7 @@
   }
 
   function stopStoryVoice() {
-    stopJarvisVoice();
+    stopAiVoice();
   }
 
   function typewriteAssistantResponse(htmlContent, plainText, isStory = false) {
@@ -860,7 +823,7 @@
         if (cursor) cursor.remove();
         feed.scrollTop = feed.scrollHeight;
         if (isStory && isSoundEnabled) speakStoryText(plainText, storyControls);
-        else if (isSoundEnabled) speakJarvisText(plainText);
+        else if (isSoundEnabled) speakAssistantVoice(plainText);
       }
     });
 
@@ -877,12 +840,12 @@
         if (cursor) cursor.remove();
         feed.scrollTop = feed.scrollHeight;
 
-        // Auto-start voice narration for story or answer in Jarvis voice
+        // Auto-start voice narration for story or answer in Evidex AI voice
         if (isSoundEnabled) {
           if (isStory) {
             speakStoryText(plainText, storyControls);
           } else {
-            speakJarvisText(plainText);
+            speakAssistantVoice(plainText);
           }
         }
       }
@@ -1071,13 +1034,6 @@
       });
     }
 
-    const jarvisSampleBtn = document.getElementById('aiPlayJarvisSampleBtn');
-    if (jarvisSampleBtn) {
-      jarvisSampleBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        playJarvisSample();
-      });
-    }
 
     const sendBtn = document.getElementById('aiSendBtn');
     const input = document.getElementById('aiPromptInput');

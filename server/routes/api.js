@@ -267,7 +267,7 @@ REQUIREMENTS:
    Chapter II: Digital Evidence & Cryptographic Sealing
    Chapter III: Chain of Custody & Forensic Trail
    Chapter IV: Judicial Standing & Court Readiness
-2. Embody the narrative voice of J.A.R.V.I.S. (Iron Man): sophisticated, articulate, measured, British formal tone, addressing the user respectfully ('sir').
+2. Narrate the investigative story with a clear, articulate, professional Indian legal narrative voice, addressing the officer respectfully ('Officer' or 'Sir').
 3. Keep the narration concise (~250-320 words) so it is perfect for voice narration.`;
 
         const discovery = await getAvailableGeminiModels(apiKey);
@@ -379,8 +379,8 @@ router.post('/ai/chat', async (req, res) => {
 
     if (apiKey) {
       try {
-        const systemPrompt = `You are EVIDEX AI, an elite legal intelligence assistant and cyber-forensic criminal investigator built into the Evidex Decentralized Evidence Protection & Chain of Custody System.
-Persona & Vocal Style: J.A.R.V.I.S. from Iron Man (Paul Bettany) — polite, articulate, calm, sophisticated, and respectfully formal. Address the officer as 'sir' or by their rank. Use natural phrases such as 'Right away, sir', 'According to ledger records, sir', 'All systems secure, sir'.
+        const systemPrompt = `You are EVIDEX AI, an elite legal intelligence assistant and cyber-forensic criminal investigator built into the Evidex Decentralized Evidence Protection & Chain of Custody System (handling Indian legal standards, BNS, IT Act 2000, and Police Station evidence custody).
+Persona & Vocal Style: Professional, articulate, clear Indian English legal intelligence specialist. Address the officer respectfully ('Officer' or 'Sir'). Speak with clarity, polite composure, and natural pronunciation so case details, FIR records, evidence hashes, and legal sections are crystal clear and easy to understand.
 User Role: ${role || 'Law Enforcement Officer'}
 
 LIVE BLOCKCHAIN & CASE CONTEXT FROM EVIDEX LEDGER:
@@ -395,7 +395,7 @@ ${liveAudit.map((a, i) => `  ${i+1}. [${a.created_at}] Action: ${a.action} (Case
 
 CRITICAL INSTRUCTIONS:
 1. Provide a sharp, direct, intelligent, and context-aware answer specifically addressing what the user is asking.
-2. Maintain the calm, polite, articulate J.A.R.V.I.S. persona at all times. NEVER give repetitive, scripted, or canned template responses.
+2. Maintain a clear, professional, natural Indian English conversational persona at all times. NEVER give repetitive, scripted, or canned template responses.
 3. Ground your answer in the real cases, FIRs, evidence hashes, and chain of custody data provided above whenever relevant. If the user asks about a case, evidence, forensic procedure, or law, reason deeply and explain clearly.
 4. Keep the answer concise, articulate, and natural (~60 to 140 words) so it can be read smoothly or narrated via voice.
 5. Use clean formatting (bold key facts or use short bullet points) without excessive clutter.`;
@@ -471,7 +471,7 @@ CRITICAL INSTRUCTIONS:
   }
 });
 
-// ── J.A.R.V.I.S. VOICE TTS SYNTHESIS ──
+// ── EVIDEX AI INDIAN ENGLISH VOICE TTS SYNTHESIS ──
 router.post('/ai/tts', async (req, res) => {
   try {
     const { text } = req.body;
@@ -481,39 +481,6 @@ router.post('/ai/tts', async (req, res) => {
 
     const cleanText = text.replace(/[*#_`]/g, '').trim().substring(0, 650);
 
-    // 1. Check for Fish Audio API key (exact J.A.R.V.I.S. community voice model fde0c618febf4c0ba5115a5df43bdfd5)
-    try {
-      const fishRow = db.get("SELECT value FROM system_settings WHERE key = 'fish_audio_api_key'");
-      const fishKey = (fishRow ? fishRow.value : '') || process.env.FISH_AUDIO_API_KEY;
-      if (fishKey && fishKey.trim()) {
-        const fishRes = await fetch('https://api.fish.audio/v1/tts', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${fishKey.trim()}`,
-            'Content-Type': 'application/json'
-          },
-          signal: AbortSignal.timeout(10000),
-          body: JSON.stringify({
-            text: cleanText,
-            reference_id: 'fde0c618febf4c0ba5115a5df43bdfd5',
-            format: 'mp3'
-          })
-        });
-        if (fishRes.ok) {
-          const arrayBuffer = await fishRes.arrayBuffer();
-          const buf = Buffer.from(arrayBuffer);
-          return res.json({
-            success: true,
-            voice: 'Fish Audio Jarvis Model',
-            audioUrl: `data:audio/mp3;base64,${buf.toString('base64')}`
-          });
-        }
-      }
-    } catch (fErr) {
-      console.warn('Fish Audio API check failed, falling back to Gemini TTS:', fErr.message);
-    }
-
-    // 2. High-speed, natural styled Gemini TTS (gemini-3.8-flash-lite-tts with Charon)
     const geminiRow = db.get("SELECT value FROM system_settings WHERE key = 'gemini_api_key'");
     const apiKey = (geminiRow ? geminiRow.value : '') || process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -526,42 +493,46 @@ router.post('/ai/tts', async (req, res) => {
       'gemini-2.5-flash-preview-tts'
     ];
 
+    const voiceNames = ['Puck', 'Charon', 'Kore'];
+
     for (const model of ttsModels) {
-      try {
-        const ttsRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          signal: AbortSignal.timeout(12000),
-          body: JSON.stringify({
-            contents: [{
-              parts: [{ text: "Read the following message aloud with a natural, crisp, articulate, composed British butler cadence like J.A.R.V.I.S.:\n\n" + cleanText }]
-            }],
-            generationConfig: {
-              responseModalities: ["AUDIO"],
-              speechConfig: {
-                voiceConfig: {
-                  prebuiltVoiceConfig: {
-                    voiceName: "Charon"
+      for (const voiceName of voiceNames) {
+        try {
+          const ttsRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: AbortSignal.timeout(10000),
+            body: JSON.stringify({
+              contents: [{
+                parts: [{ text: "Speak the following message aloud with a clear, polite, natural Indian English accent (en-IN). Ensure clear pronunciation, natural pacing, and crisp articulation so every word is easy to understand:\n\n" + cleanText }]
+              }],
+              generationConfig: {
+                responseModalities: ["AUDIO"],
+                speechConfig: {
+                  voiceConfig: {
+                    prebuiltVoiceConfig: {
+                      voiceName
+                    }
                   }
                 }
               }
-            }
-          })
-        });
-
-        const data = await ttsRes.json();
-        const inlineData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-        if (inlineData && inlineData.data) {
-          const pcmBuf = Buffer.from(inlineData.data, 'base64');
-          const wavBuf = pcmToWav(pcmBuf, 24000, 1, 16);
-          return res.json({
-            success: true,
-            voice: `Jarvis (${model})`,
-            audioUrl: `data:audio/wav;base64,${wavBuf.toString('base64')}`
+            })
           });
+
+          const data = await ttsRes.json();
+          const inlineData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+          if (inlineData && inlineData.data) {
+            const pcmBuf = Buffer.from(inlineData.data, 'base64');
+            const wavBuf = pcmToWav(pcmBuf, 24000, 1, 16);
+            return res.json({
+              success: true,
+              voice: `Evidex AI Indian English (${model} - ${voiceName})`,
+              audioUrl: `data:audio/wav;base64,${wavBuf.toString('base64')}`
+            });
+          }
+        } catch (mErr) {
+          console.warn(`TTS attempt with ${model}/${voiceName} failed:`, mErr.message);
         }
-      } catch (mErr) {
-        console.warn(`TTS model ${model} failed, trying next:`, mErr.message);
       }
     }
 

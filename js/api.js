@@ -327,8 +327,8 @@
       }
     },
 
-    // J.A.R.V.I.S. Voice Audio Synthesis
-    async generateJarvisTts(text) {
+    // Indian English AI Voice Audio Synthesis
+    async generateIndianTts(text) {
       try {
         const res = await fetch(`${API_BASE}/ai/tts`, {
           method: 'POST',
@@ -339,6 +339,11 @@
       } catch (err) {
         return { success: false, fallback: true, error: err.message };
       }
+    },
+
+    // Backward compatibility alias
+    async generateJarvisTts(text) {
+      return this.generateIndianTts(text);
     }
   };
 
