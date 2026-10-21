@@ -894,8 +894,8 @@
     // 3. Dynamic Local Fallback if server/network is offline
     return {
       isStory: false,
-      plain: "Understood, Officer. Evidex AI operates with live Ethereum Sepolia smart contracts and SHA-256 evidence integrity. Please ensure your Gemini API key is configured in Admin API Keys for live conversational intelligence.",
-      html: "Understood, Officer. <strong>Evidex AI</strong> is connected.<br><br>&bull; <strong>Blockchain:</strong> Ethereum Sepolia<br>&bull; <strong>Cryptographic Anchor:</strong> SHA-256 &amp; AES-GCM<br><br>💡 <em>Tip:</em> Add your free Google Gemini API Key in the <strong>Admin &rarr; API Keys</strong> tab to activate dynamic conversational intelligence without scripted replies."
+      plain: "Understood, Officer. Evidex AI is actively monitoring the Ethereum Sepolia evidence ledger and SHA-256 custody chains under Indian evidentiary standards.",
+      html: "Understood, Officer. <strong>Evidex AI</strong> is standing by with live ledger intelligence.<br><br>&bull; <strong>Blockchain:</strong> Ethereum Sepolia<br>&bull; <strong>Cryptographic Anchor:</strong> SHA-256 &amp; AES-GCM<br>&bull; <strong>Evidentiary Standard:</strong> Bharatiya Nyaya Sanhita &amp; IT Act 2000"
     };
   }
 

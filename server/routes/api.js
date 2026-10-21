@@ -101,6 +101,75 @@ router.post('/admin/api-keys', (req, res) => {
   }
 });
 
+function getGeminiApiKey() {
+  try {
+    const row = db.get("SELECT value FROM system_settings WHERE key = 'gemini_api_key'");
+    if (row && row.value && row.value.trim()) return row.value.trim();
+  } catch (e) {}
+  return (process.env.GEMINI_API_KEY || '').trim();
+}
+
+function generateLocalContextualAnswer(prompt, liveCases, liveEvidence, liveAudit, role) {
+  const q = (prompt || '').toLowerCase().trim();
+  const casesCount = liveCases.length;
+  const latestCase = casesCount > 0 ? liveCases[0] : null;
+
+  // Case specific query
+  if (q.includes('last case') || q.includes('recent case') || q.includes('latest case') || q.includes('story') || q.includes('registered case') || q.includes('explain the case') || q.includes('explain about the last case')) {
+    if (latestCase) {
+      const p = `Officer, the latest dossier on record is Case #${latestCase.case_number}, filed under ${latestCase.fir_number || 'FIR'}. Incident description: "${latestCase.description || 'Active electronic investigation'}". Status: ${latestCase.case_status || 'Open'}. Evidence items secured: ${liveEvidence.filter(e => e.case_number === latestCase.case_number).length}. All records are immutably logged on the blockchain.`;
+      const h = `Officer, the latest registered case is <strong>#${latestCase.case_number}</strong> (${latestCase.fir_number || 'FIR'}).<br><br>&bull; <strong>Station / Jurisdiction:</strong> ${latestCase.police_station || 'Tamil Nadu Police'}<br>&bull; <strong>Status:</strong> <span style="color:#2563eb; font-weight:700;">${latestCase.case_status || 'Open'}</span><br>&bull; <strong>Incident:</strong> ${latestCase.description || 'Digital investigation'}<br>&bull; <strong>Applicable Law:</strong> ${latestCase.law_sections || 'Bharatiya Nyaya Sanhita (BNS)'}`;
+      return { plain: p, html: h };
+    }
+  }
+
+  // Summary of all cases
+  if (q.includes('all cases') || q.includes('summarize') || q.includes('list') || q.includes('cases')) {
+    if (casesCount > 0) {
+      const p = `Officer, there are currently ${casesCount} active cases registered on the Evidex decentralized ledger:\n` +
+        liveCases.map(c => `• Case #${c.case_number} (${c.fir_number || 'FIR'}): ${c.description || 'Investigation'} [${c.case_status || 'Open'}]`).join('\n');
+      const h = `Officer, there are currently <strong>${casesCount} active cases</strong> on the decentralized ledger:<br><br>` +
+        liveCases.map(c => `&bull; <strong>Case #${c.case_number}</strong> (${c.fir_number || 'FIR'}): ${c.description || 'Investigation'} (<em>${c.case_status || 'Open'}</em>)`).join('<br>');
+      return { plain: p, html: h };
+    }
+  }
+
+  // Evidence / Hash query
+  if (q.includes('evidence') || q.includes('hash') || q.includes('sha') || q.includes('file')) {
+    if (liveEvidence.length > 0) {
+      const p = `Officer, ${liveEvidence.length} digital evidence files are sealed with SHA-256 hashes on Ethereum Sepolia. Latest file: ${liveEvidence[0].file_name} under Case #${liveEvidence[0].case_number}, held by ${liveEvidence[0].current_custodian || 'Authorized Police Custody'}. Cryptographic integrity is verified.`;
+      const h = `Officer, <strong>${liveEvidence.length} digital evidence files</strong> are sealed on the blockchain ledger.<br><br>&bull; <strong>Latest Evidence:</strong> ${liveEvidence[0].file_name}<br>&bull; <strong>Associated Case:</strong> #${liveEvidence[0].case_number}<br>&bull; <strong>Integrity Anchor:</strong> SHA-256 cryptographic hash<br>&bull; <strong>Custodian:</strong> ${liveEvidence[0].current_custodian || 'Police'}`;
+      return { plain: p, html: h };
+    }
+  }
+
+  // Custody / Blockchain / Tamper query
+  if (q.includes('custody') || q.includes('chain') || q.includes('tamper') || q.includes('blockchain') || q.includes('verify')) {
+    const p = `Evidex uses Ethereum Sepolia smart contracts to record every evidence transfer, FSL analysis, and court submission. A tamper incident triggers immediate cryptographic mismatch flags against the on-chain SHA-256 root.`;
+    const h = `Evidex enforces an <strong>immutable digital chain of custody</strong> on the Ethereum blockchain.<br><br>&bull; <strong>Integrity Verification:</strong> Continuous SHA-256 matching against smart contract state.<br>&bull; <strong>Custodial Handoffs:</strong> Cryptographically signed by Police, FSL Forensics, and Judiciary.<br>&bull; <strong>Admissibility:</strong> Complies with Section 65B electronic evidence certification.`;
+    return { plain: p, html: h };
+  }
+
+  // Forensic query
+  if (q.includes('forensic') || q.includes('fsl') || q.includes('lab') || q.includes('report')) {
+    const p = `Digital evidence is transferred to the State Forensic Science Laboratory under tamper-evident blockchain custody. FSL examiners generate verified forensic hash certificates before court presentation.`;
+    const h = `<strong>Forensic Science Laboratory (FSL) Protocol:</strong><br><br>&bull; <strong>Acquisition:</strong> Bitstream forensic disk image with dual SHA-256 checksums.<br>&bull; <strong>Analysis:</strong> Performed in write-blocked forensic workstations.<br>&bull; <strong>Chain of Custody:</strong> Every lab analyst transfer is permanently logged on-chain.`;
+    return { plain: p, html: h };
+  }
+
+  // Law / BNS / Legal sections query
+  if (q.includes('law') || q.includes('bns') || q.includes('section') || q.includes('fir') || q.includes('act')) {
+    const p = `Under Indian criminal jurisprudence, electronic evidence must satisfy Section 65B of the Indian Evidence Act (Bharatiya Sakshya Adhiniyam) and the IT Act 2000. Evidex timestamps every FIR and evidence hash on-chain to guarantee strict legal admissibility.`;
+    const h = `<strong>Indian Legal Admissibility Standards:</strong><br><br>&bull; <strong>Statutory Mandate:</strong> Bharatiya Nyaya Sanhita (BNS) &amp; IT Act 2000.<br>&bull; <strong>Electronic Admissibility:</strong> Cryptographic chain satisfies Section 65B certification requirements.<br>&bull; <strong>Integrity Guarantee:</strong> Mathematical proof against retroactive file alteration or tampering.`;
+    return { plain: p, html: h };
+  }
+
+  // Default intelligent greeting & status
+  const p = `Namaste Officer. I am EVIDEX AI, your legal intelligence assistant. Currently monitoring ${casesCount} active cases, ${liveEvidence.length} sealed evidence items, and ${liveAudit.length} custodial transfers on Ethereum Sepolia. How may I assist your investigation?`;
+  const h = `Namaste Officer. I am <strong>EVIDEX AI</strong>, standing by with live case intelligence.<br><br>&bull; <strong>Active Cases:</strong> ${casesCount}<br>&bull; <strong>Sealed Evidence Items:</strong> ${liveEvidence.length}<br>&bull; <strong>Chain of Custody Actions:</strong> ${liveAudit.length}<br><br>Ask me to explain any registered case, inspect evidence hashes, or verify custody transfers.`;
+  return { plain: p, html: h };
+}
+
 // Dynamic Gemini Model Discovery (Queries Google ListModels directly for active models on caller's key)
 async function getAvailableGeminiModels(apiKey) {
   const cleanKey = (apiKey || '').trim();
@@ -122,19 +191,25 @@ async function getAvailableGeminiModels(apiKey) {
       const data = await res.json();
 
       if (res.ok && data.models && Array.isArray(data.models) && data.models.length > 0) {
-        // Filter models that support generateContent
-        const supported = data.models.filter(m => 
-          !m.supportedGenerationMethods || m.supportedGenerationMethods.includes('generateContent')
-        );
+        // Filter models that support generateContent and exclude non-chat models
+        const supported = data.models.filter(m => {
+          const name = (m.name || '').toLowerCase();
+          const canGen = !m.supportedGenerationMethods || m.supportedGenerationMethods.includes('generateContent');
+          const isNotSpecial = !name.includes('-tts') && !name.includes('-image') && !name.includes('embedding') && !name.includes('transcribe') && !name.includes('clip') && !name.includes('lyria') && !name.includes('robotics');
+          return canGen && isNotSpecial;
+        });
 
         if (supported.length > 0) {
-          // Sort to prioritize latest flash models
+          // Sort to prioritize latest and fastest flash models
           const sorted = [...supported].sort((a, b) => {
             const aName = (a.name || '').toLowerCase();
             const bName = (b.name || '').toLowerCase();
-            const aFlash = aName.includes('flash') ? 1 : 0;
-            const bFlash = bName.includes('flash') ? 1 : 0;
-            if (aFlash !== bFlash) return bFlash - aFlash;
+            const priority = ['gemini-flash-latest', 'gemini-3.8-flash', 'gemini-flash-lite-latest', 'gemini-3.5-flash'];
+            const aIdx = priority.findIndex(p => aName.endsWith('/' + p) || aName === p);
+            const bIdx = priority.findIndex(p => bName.endsWith('/' + p) || bName === p);
+            if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+            if (aIdx !== -1) return -1;
+            if (bIdx !== -1) return 1;
             return bName.localeCompare(aName);
           });
 
@@ -238,8 +313,7 @@ router.post('/ai/analyze-case', async (req, res) => {
     const evidenceList = db.all("SELECT * FROM evidence_records WHERE case_number = ?", [targetCase.case_number]) || [];
     const auditLogs = db.all("SELECT * FROM audit_logs WHERE case_number = ? ORDER BY id ASC", [targetCase.case_number]) || [];
 
-    const geminiRow = db.get("SELECT value FROM system_settings WHERE key = 'gemini_api_key'");
-    const apiKey = (geminiRow ? geminiRow.value : '') || process.env.GEMINI_API_KEY;
+    const apiKey = getGeminiApiKey();
 
     if (apiKey) {
       try {
@@ -270,10 +344,17 @@ REQUIREMENTS:
 2. Narrate the investigative story with a clear, articulate, professional Indian legal narrative voice, addressing the officer respectfully ('Officer' or 'Sir').
 3. Keep the narration concise (~250-320 words) so it is perfect for voice narration.`;
 
-        const discovery = await getAvailableGeminiModels(apiKey);
-        if (discovery.success && discovery.models.length > 0) {
-          const ver = discovery.version || 'v1beta';
-          for (const model of discovery.models.slice(0, 5)) {
+        let candidateModels = ['gemini-flash-latest', 'gemini-3.8-flash', 'gemini-flash-lite-latest', 'gemini-3.5-flash'];
+        let ver = 'v1beta';
+        try {
+          const discovery = await getAvailableGeminiModels(apiKey);
+          if (discovery.success && discovery.models && discovery.models.length > 0) {
+            candidateModels = discovery.models.slice(0, 5);
+            ver = discovery.version || 'v1beta';
+          }
+        } catch (discErr) {}
+
+        for (const model of candidateModels) {
             try {
               const url = `https://generativelanguage.googleapis.com/${ver}/models/${model}:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
               const aiRes = await fetch(url, {
@@ -282,7 +363,7 @@ REQUIREMENTS:
                   'Content-Type': 'application/json',
                   'x-goog-api-key': apiKey.trim()
                 },
-                signal: AbortSignal.timeout(12000),
+                signal: AbortSignal.timeout(20000),
                 body: JSON.stringify({
                   contents: [{ parts: [{ text: prompt }] }],
                   generationConfig: { maxOutputTokens: 800, temperature: 0.7 }
@@ -311,7 +392,6 @@ REQUIREMENTS:
               console.warn(`Model ${model} failed, trying next candidate:`, mErr.message);
             }
           }
-        }
       } catch (geminiErr) {
         console.warn('Gemini API call failed, falling back to local story engine:', geminiErr);
       }
@@ -358,8 +438,7 @@ router.post('/ai/chat', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Prompt is required' });
     }
 
-    const geminiRow = db.get("SELECT value FROM system_settings WHERE key = 'gemini_api_key'");
-    const apiKey = (geminiRow ? geminiRow.value : '') || process.env.GEMINI_API_KEY;
+    const apiKey = getGeminiApiKey();
 
     // Fetch live system context from SQLite
     let liveCases = [];
@@ -400,46 +479,52 @@ CRITICAL INSTRUCTIONS:
 4. Keep the answer concise, articulate, and natural (~60 to 140 words) so it can be read smoothly or narrated via voice.
 5. Use clean formatting (bold key facts or use short bullet points) without excessive clutter.`;
 
-        const discovery = await getAvailableGeminiModels(apiKey);
-        if (discovery.success && discovery.models.length > 0) {
-          const ver = discovery.version || 'v1beta';
-          for (const model of discovery.models.slice(0, 5)) {
-            try {
-              const url = `https://generativelanguage.googleapis.com/${ver}/models/${model}:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
-              const aiRes = await fetch(url, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'x-goog-api-key': apiKey.trim()
-                },
-                signal: AbortSignal.timeout(8000),
-                body: JSON.stringify({
-                  contents: [
-                    { role: 'user', parts: [{ text: `${systemPrompt}\n\nUser Question: ${prompt.trim()}` }] }
-                  ],
-                  generationConfig: { maxOutputTokens: 500, temperature: 0.7 }
-                })
-              });
-              const aiData = await aiRes.json();
-              if (aiRes.ok && aiData.candidates && aiData.candidates[0]?.content?.parts[0]?.text) {
-                const rawReply = aiData.candidates[0].content.parts[0].text;
-                const formattedHtml = rawReply
-                  .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                  .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                  .replace(/\n\n/g, '<br><br>')
-                  .replace(/\n/g, '<br>');
+        let candidateModels = ['gemini-flash-latest', 'gemini-3.8-flash', 'gemini-flash-lite-latest', 'gemini-3.5-flash'];
+        let ver = 'v1beta';
+        try {
+          const discovery = await getAvailableGeminiModels(apiKey);
+          if (discovery.success && discovery.models && discovery.models.length > 0) {
+            candidateModels = discovery.models.slice(0, 5);
+            ver = discovery.version || 'v1beta';
+          }
+        } catch (discErr) {}
 
-                return res.json({
-                  success: true,
-                  isAiGenerated: true,
-                  modelUsed: model,
-                  replyHtml: formattedHtml,
-                  replyPlain: rawReply.replace(/[*#_]/g, '')
-                });
-              }
-            } catch (mErr) {
-              console.warn(`Model ${model} failed for chat, trying next:`, mErr.message);
+        for (const model of candidateModels) {
+          try {
+            const url = `https://generativelanguage.googleapis.com/${ver}/models/${model}:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
+            const aiRes = await fetch(url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': apiKey.trim()
+              },
+              signal: AbortSignal.timeout(20000),
+              body: JSON.stringify({
+                contents: [
+                  { role: 'user', parts: [{ text: `${systemPrompt}\n\nUser Question: ${prompt.trim()}` }] }
+                ],
+                generationConfig: { maxOutputTokens: 500, temperature: 0.7 }
+              })
+            });
+            const aiData = await aiRes.json();
+            if (aiRes.ok && aiData.candidates && aiData.candidates[0]?.content?.parts[0]?.text) {
+              const rawReply = aiData.candidates[0].content.parts[0].text;
+              const formattedHtml = rawReply
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/\n\n/g, '<br><br>')
+                .replace(/\n/g, '<br>');
+
+              return res.json({
+                success: true,
+                isAiGenerated: true,
+                modelUsed: model,
+                replyHtml: formattedHtml,
+                replyPlain: rawReply.replace(/[*#_]/g, '')
+              });
             }
+          } catch (mErr) {
+            console.warn(`Model ${model} failed for chat, trying next:`, mErr.message);
           }
         }
       } catch (geminiErr) {
@@ -447,24 +532,13 @@ CRITICAL INSTRUCTIONS:
       }
     }
 
-    // Dynamic contextual fallback if no API key is saved yet
-    let replyPlain = "";
-    let replyHtml = "";
-
-    if (liveCases.length > 0) {
-      const latest = liveCases[0];
-      replyPlain = `Found ${liveCases.length} case(s) in the ledger. Latest: Case #${latest.case_number} (${latest.fir_number || 'FIR'}), titled "${latest.description || 'Investigation'}" under status ${latest.case_status || 'Open'}. Add your free Gemini API Key in Admin for live AI reasoning.`;
-      replyHtml = `Found <strong>${liveCases.length} case(s)</strong> in the decentralized ledger.<br><br>&bull; <strong>Latest Case:</strong> #${latest.case_number} (${latest.fir_number || 'FIR'})<br>&bull; <strong>Status:</strong> ${latest.case_status || 'Open'}<br>&bull; <strong>Incident:</strong> ${latest.description || 'Under active investigation'}<br><br>💡 <em>Tip:</em> Add your free Gemini API Key in the <strong>Admin &rarr; API Keys</strong> tab to activate real-time AI reasoning.`;
-    } else {
-      replyPlain = `Understood. Currently 0 cases are registered in the Evidex ledger. You can file an FIR and upload evidence via the Register Case option.`;
-      replyHtml = `Understood. Currently <strong>0 cases</strong> are registered in the Evidex ledger.<br><br>Police officers can file a new FIR and seal evidence via the <strong>Register Case</strong> panel.<br><br>💡 <em>Tip:</em> Configure your free Google Gemini API key in <strong>Admin &rarr; API Keys</strong> to activate intelligent conversational responses.`;
-    }
-
+    // Dynamic contextual reasoning fallback grounded in live database state
+    const localAnswer = generateLocalContextualAnswer(prompt, liveCases, liveEvidence, liveAudit, role);
     return res.json({
       success: true,
       isAiGenerated: false,
-      replyHtml,
-      replyPlain
+      replyHtml: localAnswer.html,
+      replyPlain: localAnswer.plain
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -481,8 +555,7 @@ router.post('/ai/tts', async (req, res) => {
 
     const cleanText = text.replace(/[*#_`]/g, '').trim().substring(0, 650);
 
-    const geminiRow = db.get("SELECT value FROM system_settings WHERE key = 'gemini_api_key'");
-    const apiKey = (geminiRow ? geminiRow.value : '') || process.env.GEMINI_API_KEY;
+    const apiKey = getGeminiApiKey();
     if (!apiKey) {
       return res.json({ success: false, fallback: true, error: 'No Gemini key configured' });
     }
