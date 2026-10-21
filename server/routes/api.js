@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const config = require('../config/config');
 const db = require('../db/database');
+const { pcmToWav } = require('../services/pcmToWav');
 
 // Child routers
 const auditRoutes = require('./audit');
@@ -266,7 +267,7 @@ REQUIREMENTS:
    Chapter II: Digital Evidence & Cryptographic Sealing
    Chapter III: Chain of Custody & Forensic Trail
    Chapter IV: Judicial Standing & Court Readiness
-2. Keep it factual to the evidence while maintaining an engaging, articulate, professional storytelling tone.
+2. Embody the narrative voice of J.A.R.V.I.S. (Iron Man): sophisticated, articulate, measured, British formal tone, addressing the user respectfully ('sir').
 3. Keep the narration concise (~250-320 words) so it is perfect for voice narration.`;
 
         const discovery = await getAvailableGeminiModels(apiKey);
@@ -379,6 +380,7 @@ router.post('/ai/chat', async (req, res) => {
     if (apiKey) {
       try {
         const systemPrompt = `You are EVIDEX AI, an elite legal intelligence assistant and cyber-forensic criminal investigator built into the Evidex Decentralized Evidence Protection & Chain of Custody System.
+Persona & Vocal Style: J.A.R.V.I.S. from Iron Man (Paul Bettany) — polite, articulate, calm, sophisticated, and respectfully formal. Address the officer as 'sir' or by their rank. Use natural phrases such as 'Right away, sir', 'According to ledger records, sir', 'All systems secure, sir'.
 User Role: ${role || 'Law Enforcement Officer'}
 
 LIVE BLOCKCHAIN & CASE CONTEXT FROM EVIDEX LEDGER:
@@ -393,7 +395,7 @@ ${liveAudit.map((a, i) => `  ${i+1}. [${a.created_at}] Action: ${a.action} (Case
 
 CRITICAL INSTRUCTIONS:
 1. Provide a sharp, direct, intelligent, and context-aware answer specifically addressing what the user is asking.
-2. NEVER give repetitive, scripted, or canned template responses.
+2. Maintain the calm, polite, articulate J.A.R.V.I.S. persona at all times. NEVER give repetitive, scripted, or canned template responses.
 3. Ground your answer in the real cases, FIRs, evidence hashes, and chain of custody data provided above whenever relevant. If the user asks about a case, evidence, forensic procedure, or law, reason deeply and explain clearly.
 4. Keep the answer concise, articulate, and natural (~60 to 140 words) so it can be read smoothly or narrated via voice.
 5. Use clean formatting (bold key facts or use short bullet points) without excessive clutter.`;
@@ -466,6 +468,62 @@ CRITICAL INSTRUCTIONS:
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── J.A.R.V.I.S. VOICE TTS SYNTHESIS ──
+router.post('/ai/tts', async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ success: false, error: 'Text required' });
+    }
+
+    const geminiRow = db.get("SELECT value FROM system_settings WHERE key = 'gemini_api_key'");
+    const apiKey = (geminiRow ? geminiRow.value : '') || process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.json({ success: false, fallback: true, error: 'No Gemini key configured' });
+    }
+
+    const cleanText = text.replace(/[*#_`]/g, '').trim().substring(0, 320);
+
+    // Call Gemini 2.5 Flash TTS with Jarvis voice persona (Charon - deep, calm, British baritone)
+    const ttsRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(7000),
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ text: cleanText }]
+        }],
+        generationConfig: {
+          responseModalities: ["AUDIO"],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName: "Charon"
+              }
+            }
+          }
+        }
+      })
+    });
+
+    const data = await ttsRes.json();
+    const inlineData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+    if (inlineData && inlineData.data) {
+      const pcmBuf = Buffer.from(inlineData.data, 'base64');
+      const wavBuf = pcmToWav(pcmBuf, 24000, 1, 16);
+      return res.json({
+        success: true,
+        voice: 'Jarvis (Gemini High-Fidelity)',
+        audioUrl: `data:audio/wav;base64,${wavBuf.toString('base64')}`
+      });
+    }
+
+    return res.json({ success: false, fallback: true, error: data.error?.message || 'TTS generation unavailable' });
+  } catch (err) {
+    return res.json({ success: false, fallback: true, error: err.message });
   }
 });
 

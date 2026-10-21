@@ -160,8 +160,11 @@
               <div class="portrait-eye"></div>
               <div class="portrait-eye"></div>
             </div>
-            <div class="ai-header-info">
+            <div class="ai-header-info" style="display:flex; align-items:center; gap:8px;">
               <span class="ai-speaker-name">EVIDEX AI</span>
+              <button type="button" id="aiPlayJarvisSampleBtn" title="Play Iron Man J.A.R.V.I.S. Voice Sample" style="background:#f1f5f9; border:1px solid #cbd5e1; color:#0f172a; font-size:11px; font-weight:700; border-radius:12px; padding:2px 8px; cursor:pointer; display:inline-flex; align-items:center; gap:4px; transition:all 0.2s ease;">
+                ▶ J.A.R.V.I.S. Voice
+              </button>
             </div>
           </div>
           <div class="ai-header-controls">
@@ -178,8 +181,7 @@
         <div class="ai-dialogue-body" id="aiChatFeed">
           <div class="ai-msg assistant">
             <div class="ai-msg-bubble">
-              Greetings, Officer. I am your <strong>Evidex Case Intelligence Assistant</strong>. 
-              I track blockchain case dossiers, tamper audits, forensic lab reports, and custody transfers.
+              Welcome home, sir. I am your <strong>Evidex Case Intelligence Assistant</strong>, standing by with full J.A.R.V.I.S. voice telemetry. I monitor blockchain case dossiers, tamper audits, forensic lab reports, and custody transfers.
               <br><br>
               Ask me to explain the last registered case, summarize dossiers, or inspect chain of custody.
             </div>
@@ -589,26 +591,154 @@
     if (thinkingEl) thinkingEl.remove();
   }
 
-  // ── VOICE SPEECH NARRATION FOR STORIES ──
-  function speakStoryText(plainText, storyControlsContainer) {
-    if (!('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
+  // ── J.A.R.V.I.S. VOICE SPEECH SYSTEM ──
+  let jarvisAudioPlayer = null;
+  let jarvisSampleAudio = null;
 
-    const cleanText = plainText.replace(/[*#_]/g, '');
-    activeSpeechUtterance = new SpeechSynthesisUtterance(cleanText);
-    activeSpeechUtterance.rate = 1.0;
-    activeSpeechUtterance.pitch = 1.0;
+  function stopJarvisVoice() {
+    if (jarvisAudioPlayer) {
+      try {
+        jarvisAudioPlayer.pause();
+        jarvisAudioPlayer.currentTime = 0;
+      } catch (e) {}
+      jarvisAudioPlayer = null;
+    }
+    if (jarvisSampleAudio) {
+      try {
+        jarvisSampleAudio.pause();
+        jarvisSampleAudio.currentTime = 0;
+      } catch (e) {}
+      const sampleBtn = document.getElementById('aiPlayJarvisSampleBtn');
+      if (sampleBtn) sampleBtn.textContent = '▶ J.A.R.V.I.S. Voice';
+      jarvisSampleAudio = null;
+    }
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    isVoiceSpeaking = false;
+  }
 
-    // Pick best English voice if available
+  function playJarvisSample() {
+    const sampleBtn = document.getElementById('aiPlayJarvisSampleBtn');
+    if (jarvisSampleAudio && !jarvisSampleAudio.paused) {
+      jarvisSampleAudio.pause();
+      jarvisSampleAudio.currentTime = 0;
+      jarvisSampleAudio = null;
+      if (sampleBtn) sampleBtn.textContent = '▶ J.A.R.V.I.S. Voice';
+      return;
+    }
+
+    stopJarvisVoice();
+    const audio = new Audio('/audio/jarvis-sample.mp3');
+    jarvisSampleAudio = audio;
+    if (sampleBtn) sampleBtn.textContent = '⏹ Playing...';
+
+    audio.onended = () => {
+      jarvisSampleAudio = null;
+      if (sampleBtn) sampleBtn.textContent = '▶ J.A.R.V.I.S. Voice';
+    };
+    audio.onerror = () => {
+      jarvisSampleAudio = null;
+      if (sampleBtn) sampleBtn.textContent = '▶ J.A.R.V.I.S. Voice';
+    };
+    audio.play().catch(e => {
+      console.warn('Could not auto-play Jarvis sample:', e);
+      if (sampleBtn) sampleBtn.textContent = '▶ J.A.R.V.I.S. Voice';
+    });
+  }
+
+  function getJarvisSpeechVoice() {
+    if (!('speechSynthesis' in window)) return null;
     const voices = window.speechSynthesis.getVoices();
-    const naturalVoice = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Samantha')));
-    if (naturalVoice) activeSpeechUtterance.voice = naturalVoice;
+    if (!voices || voices.length === 0) return null;
 
-    isVoiceSpeaking = true;
+    // 1. British English Male / Natural Voices (matches Jarvis RP accent)
+    const britishMale = voices.find(v => 
+      (v.lang.startsWith('en-GB') || v.lang.startsWith('en_GB') || v.lang.startsWith('en-UK')) && 
+      (v.name.includes('George') || v.name.includes('Daniel') || v.name.includes('Oliver') || v.name.includes('Male') || v.name.includes('Natural'))
+    );
+    if (britishMale) return britishMale;
+
+    // 2. Any British English voice
+    const anyBritish = voices.find(v => v.lang.startsWith('en-GB') || v.lang.startsWith('en_GB') || v.lang.startsWith('en-UK'));
+    if (anyBritish) return anyBritish;
+
+    // 3. Natural / Google English voices
+    const naturalEn = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('David')));
+    return naturalEn || voices.find(v => v.lang.startsWith('en')) || voices[0];
+  }
+
+  async function speakJarvisText(plainText, onEnd = null) {
+    if (!isSoundEnabled) return;
+    stopJarvisVoice();
+
+    const cleanText = plainText.replace(/[*#_`]/g, '').trim();
+    if (!cleanText) return;
+
+    // If short enough (< 280 chars), try Gemini High-Fidelity J.A.R.V.I.S. TTS
+    if (cleanText.length <= 280) {
+      try {
+        const res = await window.epsApi.generateJarvisTts(cleanText);
+        if (res && res.success && res.audioUrl) {
+          isVoiceSpeaking = true;
+          const audio = new Audio(res.audioUrl);
+          jarvisAudioPlayer = audio;
+          audio.onended = () => {
+            isVoiceSpeaking = false;
+            jarvisAudioPlayer = null;
+            if (onEnd) onEnd();
+          };
+          audio.onerror = () => {
+            jarvisAudioPlayer = null;
+            fallbackWebSpeechJarvis(cleanText, onEnd);
+          };
+          await audio.play();
+          return;
+        }
+      } catch (err) {
+        // Fallback
+      }
+    }
+
+    fallbackWebSpeechJarvis(cleanText, onEnd);
+  }
+
+  function fallbackWebSpeechJarvis(cleanText, onEnd = null) {
+    if (!('speechSynthesis' in window)) return;
+    try {
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(cleanText);
+      const voice = getJarvisSpeechVoice();
+      if (voice) utter.voice = voice;
+      // Jarvis signature acoustic tuning:
+      utter.pitch = 0.90; // Smooth resonant baritone
+      utter.rate = 0.96;  // Calm, deliberate, articulate cadence
+      isVoiceSpeaking = true;
+      activeSpeechUtterance = utter;
+
+      utter.onend = () => {
+        isVoiceSpeaking = false;
+        if (onEnd) onEnd();
+      };
+      utter.onerror = () => {
+        isVoiceSpeaking = false;
+      };
+      window.speechSynthesis.speak(utter);
+    } catch (e) {
+      isVoiceSpeaking = false;
+    }
+  }
+
+  function speakStoryText(plainText, storyControlsContainer) {
+    if (!isSoundEnabled) return;
+    stopJarvisVoice();
+
+    const cleanText = plainText.replace(/[*#_]/g, '').trim();
+    if (!cleanText) return;
 
     if (storyControlsContainer) {
       storyControlsContainer.innerHTML = `
-        <span>🔊 Speaking story aloud...</span>
+        <span>🔊 Speaking story in J.A.R.V.I.S. voice...</span>
         <div style="display:flex; gap:6px;">
           <button type="button" class="ai-voice-btn-pill" id="aiPauseStoryBtn">⏸ Pause</button>
           <button type="button" class="ai-voice-btn-pill danger" id="aiStopStoryBtn">⏹ Stop</button>
@@ -620,43 +750,43 @@
 
       if (pauseBtn) {
         pauseBtn.addEventListener('click', () => {
-          if (window.speechSynthesis.paused) {
-            window.speechSynthesis.resume();
-            pauseBtn.textContent = '⏸ Pause';
-          } else {
-            window.speechSynthesis.pause();
-            pauseBtn.textContent = '▶ Resume';
+          if (jarvisAudioPlayer) {
+            if (jarvisAudioPlayer.paused) {
+              jarvisAudioPlayer.play();
+              pauseBtn.textContent = '⏸ Pause';
+            } else {
+              jarvisAudioPlayer.pause();
+              pauseBtn.textContent = '▶ Resume';
+            }
+          } else if (window.speechSynthesis) {
+            if (window.speechSynthesis.paused) {
+              window.speechSynthesis.resume();
+              pauseBtn.textContent = '⏸ Pause';
+            } else {
+              window.speechSynthesis.pause();
+              pauseBtn.textContent = '▶ Resume';
+            }
           }
         });
       }
 
       if (stopBtn) {
         stopBtn.addEventListener('click', () => {
-          stopStoryVoice();
+          stopJarvisVoice();
           storyControlsContainer.innerHTML = `<span>⏹ Narration stopped.</span>`;
         });
       }
     }
 
-    activeSpeechUtterance.onend = () => {
-      isVoiceSpeaking = false;
+    speakJarvisText(cleanText, () => {
       if (storyControlsContainer) {
-        storyControlsContainer.innerHTML = `<span>✓ Voice narration complete.</span>`;
+        storyControlsContainer.innerHTML = `<span>✓ Story narration complete.</span>`;
       }
-    };
-
-    activeSpeechUtterance.onerror = () => {
-      isVoiceSpeaking = false;
-    };
-
-    window.speechSynthesis.speak(activeSpeechUtterance);
+    });
   }
 
   function stopStoryVoice() {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
-    isVoiceSpeaking = false;
+    stopJarvisVoice();
   }
 
   function typewriteAssistantResponse(htmlContent, plainText, isStory = false) {
@@ -694,6 +824,7 @@
         if (cursor) cursor.remove();
         feed.scrollTop = feed.scrollHeight;
         if (isStory && isSoundEnabled) speakStoryText(plainText, storyControls);
+        else if (isSoundEnabled) speakJarvisText(plainText);
       }
     });
 
@@ -710,17 +841,12 @@
         if (cursor) cursor.remove();
         feed.scrollTop = feed.scrollHeight;
 
-        // Auto-start voice narration for story or answer
+        // Auto-start voice narration for story or answer in Jarvis voice
         if (isSoundEnabled) {
           if (isStory) {
             speakStoryText(plainText, storyControls);
-          } else if (window.speechSynthesis) {
-            try {
-              window.speechSynthesis.cancel();
-              const utter = new SpeechSynthesisUtterance(plainText.replace(/[#*`_]/g, ''));
-              utter.rate = 1.05;
-              window.speechSynthesis.speak(utter);
-            } catch (e) {}
+          } else {
+            speakJarvisText(plainText);
           }
         }
       }
@@ -906,6 +1032,14 @@
         if (!isSoundEnabled) {
           stopStoryVoice();
         }
+      });
+    }
+
+    const jarvisSampleBtn = document.getElementById('aiPlayJarvisSampleBtn');
+    if (jarvisSampleBtn) {
+      jarvisSampleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        playJarvisSample();
       });
     }
 
