@@ -925,17 +925,6 @@ async function connectWallet() {
     if (!chainOk) return;
 
     provider = new ethers.providers.Web3Provider(ethProvider);
-    if (shouldPromptAccountSwitch && ethProvider && ethProvider.request) {
-      try {
-        await ethProvider.request({
-          method: 'wallet_requestPermissions',
-          params: [{ eth_accounts: {} }]
-        });
-      } catch (err) {
-        console.log("MetaMask account selector dismissed:", err.message);
-      }
-      shouldPromptAccountSwitch = false;
-    }
     await provider.send("eth_requestAccounts", []);
     signer = provider.getSigner();
 
@@ -4900,10 +4889,7 @@ let verifiedAadhaarData = null;
 let isWalletAddressFormatValid = false;
 
 // ── LOGOUT / RESET ──
-let shouldPromptAccountSwitch = false;
-
 function logoutAccount() {
-  shouldPromptAccountSwitch = true;
   provider = null;
   signer = null;
   contract = null;
