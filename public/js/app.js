@@ -1028,6 +1028,9 @@ async function connectWallet() {
         landing.style.display = "none";
         app.style.display = "block";
         setTimeout(() => app.style.opacity = "1", 50);
+        if (window.evidexAi && window.evidexAi.updateVisibility) {
+          window.evidexAi.updateVisibility();
+        }
       }, 500);
     }
 
@@ -4782,6 +4785,9 @@ function logoutAccount() {
   if (landing) {
     landing.style.display = "block";
     landing.style.opacity = "1";
+    if (window.evidexAi && window.evidexAi.updateVisibility) {
+      window.evidexAi.updateVisibility();
+    }
   }
 }
 

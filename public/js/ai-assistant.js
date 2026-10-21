@@ -1045,19 +1045,67 @@
       .replace(/'/g, '&#039;');
   }
 
+  // ── VISIBILITY LOGIC (NOT PRESENT ON STARTING PAGE) ──
+  function updateAiWidgetVisibility() {
+    const widget = document.getElementById('evidexAiWidget');
+    if (!widget) return;
+
+    const landing = document.getElementById('landingPage');
+    const app = document.getElementById('appContent');
+
+    // On starting page: landingPage is visible, or appContent is hidden
+    const isLandingVisible = landing && (landing.style.display !== 'none' && window.getComputedStyle(landing).display !== 'none');
+    const isAppVisible = app && (app.style.display !== 'none' && window.getComputedStyle(app).display !== 'none');
+
+    if (!isLandingVisible && isAppVisible) {
+      widget.classList.add('visible');
+      widget.style.display = 'block';
+    } else {
+      widget.classList.remove('visible');
+      widget.style.display = 'none';
+      closeDialogueBox();
+    }
+  }
+
+  function setupVisibilityObserver() {
+    // Initial check
+    updateAiWidgetVisibility();
+
+    // Observe changes to landingPage and appContent display/style
+    const landing = document.getElementById('landingPage');
+    const app = document.getElementById('appContent');
+
+    const observer = new MutationObserver(() => {
+      updateAiWidgetVisibility();
+    });
+
+    if (landing) {
+      observer.observe(landing, { attributes: true, attributeFilter: ['style', 'class'] });
+    }
+    if (app) {
+      observer.observe(app, { attributes: true, attributeFilter: ['style', 'class'] });
+    }
+
+    // Also listen to navigation changes
+    window.addEventListener('popstate', updateAiWidgetVisibility);
+    window.addEventListener('hashchange', updateAiWidgetVisibility);
+  }
+
   // ── INITIALIZATION ──
   function init() {
     injectWidgetDOM();
     initAvatarCanvas();
     initVoiceRecognition();
     attachEventListeners();
+    setupVisibilityObserver();
 
-    // Expose for testing
+    // Expose for testing & integration
     window.evidexAi = {
       setState,
       open: openDialogueBox,
       close: closeDialogueBox,
-      ask: handleQuestionSubmit
+      ask: handleQuestionSubmit,
+      updateVisibility: updateAiWidgetVisibility
     };
   }
 
