@@ -652,12 +652,12 @@
     const voices = window.speechSynthesis.getVoices();
     if (!voices || voices.length === 0) return null;
 
-    // 1. British English Male / Natural Voices (matches Jarvis RP accent)
-    const britishMale = voices.find(v => 
+    // 1. Natural British Voices (Ryan, George, Oliver, Daniel)
+    const britishNatural = voices.find(v => 
       (v.lang.startsWith('en-GB') || v.lang.startsWith('en_GB') || v.lang.startsWith('en-UK')) && 
-      (v.name.includes('George') || v.name.includes('Daniel') || v.name.includes('Oliver') || v.name.includes('Male') || v.name.includes('Natural'))
+      (v.name.includes('Ryan') || v.name.includes('George') || v.name.includes('Oliver') || v.name.includes('Daniel') || v.name.includes('Natural') || v.name.includes('Male'))
     );
-    if (britishMale) return britishMale;
+    if (britishNatural) return britishNatural;
 
     // 2. Any British English voice
     const anyBritish = voices.find(v => v.lang.startsWith('en-GB') || v.lang.startsWith('en_GB') || v.lang.startsWith('en-UK'));
@@ -675,8 +675,8 @@
     const cleanText = plainText.replace(/[*#_`]/g, '').trim();
     if (!cleanText) return;
 
-    // If short enough (< 280 chars), try Gemini High-Fidelity J.A.R.V.I.S. TTS
-    if (cleanText.length <= 280) {
+    // Try high-fidelity neural J.A.R.V.I.S. TTS first (up to 650 characters)
+    if (cleanText.length <= 650) {
       try {
         const res = await window.epsApi.generateJarvisTts(cleanText);
         if (res && res.success && res.audioUrl) {
@@ -710,9 +710,9 @@
       const utter = new SpeechSynthesisUtterance(cleanText);
       const voice = getJarvisSpeechVoice();
       if (voice) utter.voice = voice;
-      // Jarvis signature acoustic tuning:
-      utter.pitch = 0.90; // Smooth resonant baritone
-      utter.rate = 0.96;  // Calm, deliberate, articulate cadence
+      // Natural, casual, articulate conversational cadence
+      utter.pitch = 1.0; 
+      utter.rate = 1.06;
       isVoiceSpeaking = true;
       activeSpeechUtterance = utter;
 
@@ -778,11 +778,47 @@
       }
     }
 
-    speakJarvisText(cleanText, () => {
-      if (storyControlsContainer) {
-        storyControlsContainer.innerHTML = `<span>✓ Story narration complete.</span>`;
+    // Split story into natural paragraphs/sentences so each segment is synthesized via high-fidelity neural Jarvis TTS
+    const paragraphs = cleanText.split(/\n+/).map(p => p.trim()).filter(Boolean);
+    const chunks = [];
+    for (const p of paragraphs) {
+      if (p.length <= 400) {
+        chunks.push(p);
+      } else {
+        const sentences = p.match(/[^.!?]+[.!?]+(\s|$)|[^.!?]+$/g) || [p];
+        let cur = '';
+        for (const s of sentences) {
+          if ((cur + s).length <= 400) {
+            cur += s;
+          } else {
+            if (cur) chunks.push(cur.trim());
+            cur = s;
+          }
+        }
+        if (cur) chunks.push(cur.trim());
       }
-    });
+    }
+
+    let chunkIdx = 0;
+    isVoiceSpeaking = true;
+
+    async function playNextChunk() {
+      if (!isVoiceSpeaking) return;
+      if (chunkIdx >= chunks.length) {
+        isVoiceSpeaking = false;
+        if (storyControlsContainer) {
+          storyControlsContainer.innerHTML = `<span>✓ Story narration complete.</span>`;
+        }
+        return;
+      }
+
+      const textToPlay = chunks[chunkIdx++];
+      await speakJarvisText(textToPlay, () => {
+        playNextChunk();
+      });
+    }
+
+    playNextChunk();
   }
 
   function stopStoryVoice() {

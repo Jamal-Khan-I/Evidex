@@ -479,49 +479,93 @@ router.post('/ai/tts', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Text required' });
     }
 
+    const cleanText = text.replace(/[*#_`]/g, '').trim().substring(0, 650);
+
+    // 1. Check for Fish Audio API key (exact J.A.R.V.I.S. community voice model fde0c618febf4c0ba5115a5df43bdfd5)
+    try {
+      const fishRow = db.get("SELECT value FROM system_settings WHERE key = 'fish_audio_api_key'");
+      const fishKey = (fishRow ? fishRow.value : '') || process.env.FISH_AUDIO_API_KEY;
+      if (fishKey && fishKey.trim()) {
+        const fishRes = await fetch('https://api.fish.audio/v1/tts', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${fishKey.trim()}`,
+            'Content-Type': 'application/json'
+          },
+          signal: AbortSignal.timeout(10000),
+          body: JSON.stringify({
+            text: cleanText,
+            reference_id: 'fde0c618febf4c0ba5115a5df43bdfd5',
+            format: 'mp3'
+          })
+        });
+        if (fishRes.ok) {
+          const arrayBuffer = await fishRes.arrayBuffer();
+          const buf = Buffer.from(arrayBuffer);
+          return res.json({
+            success: true,
+            voice: 'Fish Audio Jarvis Model',
+            audioUrl: `data:audio/mp3;base64,${buf.toString('base64')}`
+          });
+        }
+      }
+    } catch (fErr) {
+      console.warn('Fish Audio API check failed, falling back to Gemini TTS:', fErr.message);
+    }
+
+    // 2. High-speed, natural styled Gemini TTS (gemini-3.8-flash-lite-tts with Charon)
     const geminiRow = db.get("SELECT value FROM system_settings WHERE key = 'gemini_api_key'");
     const apiKey = (geminiRow ? geminiRow.value : '') || process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return res.json({ success: false, fallback: true, error: 'No Gemini key configured' });
     }
 
-    const cleanText = text.replace(/[*#_`]/g, '').trim().substring(0, 320);
+    const ttsModels = [
+      'gemini-3.8-flash-lite-tts',
+      'gemini-3.8-flash-tts',
+      'gemini-2.5-flash-preview-tts'
+    ];
 
-    // Call Gemini 2.5 Flash TTS with Jarvis voice persona (Charon - deep, calm, British baritone)
-    const ttsRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(7000),
-      body: JSON.stringify({
-        contents: [{
-          parts: [{ text: cleanText }]
-        }],
-        generationConfig: {
-          responseModalities: ["AUDIO"],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: {
-                voiceName: "Charon"
+    for (const model of ttsModels) {
+      try {
+        const ttsRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(12000),
+          body: JSON.stringify({
+            contents: [{
+              parts: [{ text: "Read the following message aloud with a natural, crisp, articulate, composed British butler cadence like J.A.R.V.I.S.:\n\n" + cleanText }]
+            }],
+            generationConfig: {
+              responseModalities: ["AUDIO"],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: {
+                    voiceName: "Charon"
+                  }
+                }
               }
             }
-          }
-        }
-      })
-    });
+          })
+        });
 
-    const data = await ttsRes.json();
-    const inlineData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-    if (inlineData && inlineData.data) {
-      const pcmBuf = Buffer.from(inlineData.data, 'base64');
-      const wavBuf = pcmToWav(pcmBuf, 24000, 1, 16);
-      return res.json({
-        success: true,
-        voice: 'Jarvis (Gemini High-Fidelity)',
-        audioUrl: `data:audio/wav;base64,${wavBuf.toString('base64')}`
-      });
+        const data = await ttsRes.json();
+        const inlineData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+        if (inlineData && inlineData.data) {
+          const pcmBuf = Buffer.from(inlineData.data, 'base64');
+          const wavBuf = pcmToWav(pcmBuf, 24000, 1, 16);
+          return res.json({
+            success: true,
+            voice: `Jarvis (${model})`,
+            audioUrl: `data:audio/wav;base64,${wavBuf.toString('base64')}`
+          });
+        }
+      } catch (mErr) {
+        console.warn(`TTS model ${model} failed, trying next:`, mErr.message);
+      }
     }
 
-    return res.json({ success: false, fallback: true, error: data.error?.message || 'TTS generation unavailable' });
+    return res.json({ success: false, fallback: true, error: 'TTS generation unavailable' });
   } catch (err) {
     return res.json({ success: false, fallback: true, error: err.message });
   }
