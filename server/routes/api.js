@@ -317,7 +317,7 @@ Key Capabilities:
   }
 
   // 12. Default intelligent greeting & interactive prompts
-  const p = `Namaste Officer. I am EVIDEX AI, your digital forensic and legal intelligence assistant. Currently monitoring ${casesCount} active case(s), ${evidenceCount} sealed evidence item(s), and ${auditCount} custodial actions on Ethereum Sepolia.
+  const p = `Greetings, Officer. I am EVIDEX AI, your digital forensic and legal intelligence assistant. Currently monitoring ${casesCount} active case(s), ${evidenceCount} sealed evidence item(s), and ${auditCount} custodial actions on Ethereum Sepolia.
 
 You can ask me:
 • How to register a case and seal evidence
@@ -325,7 +325,7 @@ You can ask me:
 • How custody transfers work between Police, FSL, and Court
 • Explain the latest registered case dossier`;
 
-  const h = `Namaste Officer. I am <strong>EVIDEX AI</strong>, standing by with live case intelligence.<br><br>
+  const h = `Greetings, Officer. I am <strong>EVIDEX AI</strong>, standing by with live case intelligence.<br><br>
 &bull; <strong>Active Cases:</strong> ${casesCount}<br>
 &bull; <strong>Sealed Evidence Items:</strong> ${evidenceCount}<br>
 &bull; <strong>Chain of Custody Actions:</strong> ${auditCount}<br><br>
@@ -671,7 +671,7 @@ ${liveAudit.map((a, i) => `  ${i+1}. [${a.created_at}] Action: ${a.action} (Case
 CRITICAL INSTRUCTIONS:
 1. Provide a direct, intelligent, and context-aware answer specifically addressing what the user is asking.
 2. If the user asks how to do something (e.g., register a case, verify evidence, transfer custody), give clear, sequential, numbered steps based on the Evidex workflows above.
-3. Maintain a professional, articulate Indian English conversational persona. Address the officer respectfully ('Officer' or 'Sir').
+3. Maintain a professional, articulate conversational persona. Address the officer respectfully ('Officer' or 'Sir'). Always use professional English greetings such as 'Greetings, Officer', 'Hello Officer', or 'Good day, Officer'. Never use 'Namaste' or other non-English greetings.
 4. Keep the answer concise and well-structured (~100 to 220 words) with clear bold headings and bullet points.`;
 
         const candidateModels = ['gemini-flash-lite-latest'];
