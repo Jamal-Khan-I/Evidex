@@ -75,15 +75,11 @@ router.use('/cases', casesRoutes);
 router.get('/admin/api-keys', (req, res) => {
   try {
     const geminiRow = db.get("SELECT value FROM system_settings WHERE key = 'gemini_api_key'");
-    const openaiRow = db.get("SELECT value FROM system_settings WHERE key = 'openai_api_key'");
     const geminiKey = (geminiRow ? geminiRow.value : '') || process.env.GEMINI_API_KEY || '';
-    const openaiKey = (openaiRow ? openaiRow.value : '') || process.env.OPENAI_API_KEY || '';
     res.json({
       success: true,
       geminiApiKey: geminiKey,
-      openaiApiKey: openaiKey,
-      hasGemini: !!geminiKey,
-      hasOpenai: !!openaiKey
+      hasGemini: !!geminiKey
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -92,17 +88,13 @@ router.get('/admin/api-keys', (req, res) => {
 
 router.post('/admin/api-keys', (req, res) => {
   try {
-    const { geminiApiKey, openaiApiKey } = req.body;
+    const { geminiApiKey } = req.body;
     const now = new Date().toISOString();
     if (geminiApiKey !== undefined) {
       db.run("INSERT OR REPLACE INTO system_settings (key, value, updated_at) VALUES ('gemini_api_key', ?, ?)", [geminiApiKey.trim(), now]);
       process.env.GEMINI_API_KEY = geminiApiKey.trim();
     }
-    if (openaiApiKey !== undefined) {
-      db.run("INSERT OR REPLACE INTO system_settings (key, value, updated_at) VALUES ('openai_api_key', ?, ?)", [openaiApiKey.trim(), now]);
-      process.env.OPENAI_API_KEY = openaiApiKey.trim();
-    }
-    res.json({ success: true, message: 'API keys saved successfully.' });
+    res.json({ success: true, message: 'Gemini API key saved successfully.' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -123,7 +115,8 @@ async function getAvailableGeminiModels(apiKey) {
         headers: {
           'Content-Type': 'application/json',
           'x-goog-api-key': cleanKey
-        }
+        },
+        signal: AbortSignal.timeout(6000)
       });
       const data = await res.json();
 
@@ -169,64 +162,54 @@ async function getAvailableGeminiModels(apiKey) {
 
 router.post('/ai/test-key', async (req, res) => {
   try {
-    const { key, provider } = req.body;
+    const { key } = req.body;
     if (!key) return res.status(400).json({ success: false, error: 'API key is required' });
 
-    if (provider === 'gemini' || !provider) {
-      const discovery = await getAvailableGeminiModels(key);
-      if (!discovery.success) {
-        return res.status(400).json({
-          success: false,
-          error: discovery.error || 'Invalid Gemini API key or connection failed'
-        });
-      }
-
-      const ver = discovery.version || 'v1beta';
-      let lastGenError = null;
-
-      // Test top active models returned by Google for this key
-      for (const model of discovery.models.slice(0, 5)) {
-        try {
-          const genUrl = `https://generativelanguage.googleapis.com/${ver}/models/${model}:generateContent?key=${encodeURIComponent(key.trim())}`;
-          const genRes = await fetch(genUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-goog-api-key': key.trim()
-            },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: 'Respond with OK' }] }]
-            })
-          });
-          const genData = await genRes.json();
-          if (genRes.ok) {
-            return res.json({
-              success: true,
-              message: `Google Gemini verified successfully! (Active Model: ${model})`,
-              model
-            });
-          } else {
-            lastGenError = genData.error?.message || 'Generation failed';
-          }
-        } catch (e) {
-          lastGenError = e.message;
-        }
-      }
-
+    const discovery = await getAvailableGeminiModels(key);
+    if (!discovery.success) {
       return res.status(400).json({
         success: false,
-        error: lastGenError || 'Failed to generate response with available Gemini models'
+        error: discovery.error || 'Invalid Gemini API key or connection failed'
       });
-    } else {
-      const apiRes = await fetch('https://api.openai.com/v1/models', {
-        headers: { 'Authorization': `Bearer ${key.trim()}` }
-      });
-      if (apiRes.ok) {
-        return res.json({ success: true, message: 'OpenAI connection verified successfully!' });
-      } else {
-        return res.status(400).json({ success: false, error: 'Invalid OpenAI API key' });
+    }
+
+    const ver = discovery.version || 'v1beta';
+    let lastGenError = null;
+
+    // Test top active models returned by Google for this key
+    for (const model of discovery.models.slice(0, 5)) {
+      try {
+        const genUrl = `https://generativelanguage.googleapis.com/${ver}/models/${model}:generateContent?key=${encodeURIComponent(key.trim())}`;
+        const genRes = await fetch(genUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': key.trim()
+          },
+          signal: AbortSignal.timeout(8000),
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: 'Respond with OK' }] }]
+          })
+        });
+        const genData = await genRes.json();
+        if (genRes.ok) {
+          return res.json({
+            success: true,
+            message: `Google Gemini verified successfully! (Active Model: ${model})`,
+            model
+          });
+        } else {
+          lastGenError = genData.error?.message || 'Generation failed';
+        }
+      } catch (e) {
+        lastGenError = e.message;
       }
     }
+
+    return res.status(400).json({
+      success: false,
+      error: lastGenError || 'Failed to generate response with available Gemini models'
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -298,6 +281,7 @@ REQUIREMENTS:
                   'Content-Type': 'application/json',
                   'x-goog-api-key': apiKey.trim()
                 },
+                signal: AbortSignal.timeout(12000),
                 body: JSON.stringify({
                   contents: [{ parts: [{ text: prompt }] }],
                   generationConfig: { maxOutputTokens: 800, temperature: 0.7 }
@@ -359,6 +343,126 @@ The complete cryptographic dossier is locked and admissible under electronic jud
       title: targetCase.title,
       storyHtml,
       storyPlain
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── CONVERSATIONAL AI CHAT (POWERED BY GEMINI & LIVE BLOCKCHAIN CONTEXT) ──
+router.post('/ai/chat', async (req, res) => {
+  try {
+    const { prompt, role } = req.body;
+    if (!prompt || !prompt.trim()) {
+      return res.status(400).json({ success: false, error: 'Prompt is required' });
+    }
+
+    const geminiRow = db.get("SELECT value FROM system_settings WHERE key = 'gemini_api_key'");
+    const apiKey = (geminiRow ? geminiRow.value : '') || process.env.GEMINI_API_KEY;
+
+    // Fetch live system context from SQLite
+    let liveCases = [];
+    try {
+      liveCases = db.all("SELECT case_number, fir_number, police_station, law_sections, description, registered_by, case_status, created_at FROM cases ORDER BY rowid DESC LIMIT 8") || [];
+    } catch (e) {}
+
+    let liveEvidence = [];
+    try {
+      liveEvidence = db.all("SELECT case_number, file_name, file_hash, file_size, current_custodian, created_at FROM evidence_records ORDER BY rowid DESC LIMIT 10") || [];
+    } catch (e) {}
+
+    let liveAudit = [];
+    try {
+      liveAudit = db.all("SELECT action, wallet_address, case_number, details, created_at FROM audit_logs ORDER BY id DESC LIMIT 6") || [];
+    } catch (e) {}
+
+    if (apiKey) {
+      try {
+        const systemPrompt = `You are EVIDEX AI, an elite legal intelligence assistant and cyber-forensic criminal investigator built into the Evidex Decentralized Evidence Protection & Chain of Custody System.
+User Role: ${role || 'Law Enforcement Officer'}
+
+LIVE BLOCKCHAIN & CASE CONTEXT FROM EVIDEX LEDGER:
+- Registered Cases (${liveCases.length} total):
+${liveCases.map((c, i) => `  ${i+1}. Case #${c.case_number} | FIR: ${c.fir_number || 'N/A'} | Station: ${c.police_station || 'TN Police'} | Sections: ${c.law_sections || 'BNS'} | Status: ${c.case_status || 'Open'} | Incident: "${c.description || 'Digital evidence investigation'}"`).join('\n') || '  No cases registered yet.'}
+
+- Sealed Digital Evidence (${liveEvidence.length} items):
+${liveEvidence.map((e, i) => `  ${i+1}. ${e.file_name} (Case: ${e.case_number}, SHA-256: ${e.file_hash.substring(0, 16)}..., Custodian: ${e.current_custodian || 'Police'})`).join('\n') || '  No evidence files attached yet.'}
+
+- Recent Custody Trail & Audit Logs:
+${liveAudit.map((a, i) => `  ${i+1}. [${a.created_at}] Action: ${a.action} (Case: ${a.case_number || 'Global'})`).join('\n') || '  No custody transfers yet.'}
+
+CRITICAL INSTRUCTIONS:
+1. Provide a sharp, direct, intelligent, and context-aware answer specifically addressing what the user is asking.
+2. NEVER give repetitive, scripted, or canned template responses.
+3. Ground your answer in the real cases, FIRs, evidence hashes, and chain of custody data provided above whenever relevant. If the user asks about a case, evidence, forensic procedure, or law, reason deeply and explain clearly.
+4. Keep the answer concise, articulate, and natural (~60 to 140 words) so it can be read smoothly or narrated via voice.
+5. Use clean formatting (bold key facts or use short bullet points) without excessive clutter.`;
+
+        const discovery = await getAvailableGeminiModels(apiKey);
+        if (discovery.success && discovery.models.length > 0) {
+          const ver = discovery.version || 'v1beta';
+          for (const model of discovery.models.slice(0, 5)) {
+            try {
+              const url = `https://generativelanguage.googleapis.com/${ver}/models/${model}:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
+              const aiRes = await fetch(url, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-goog-api-key': apiKey.trim()
+                },
+                signal: AbortSignal.timeout(8000),
+                body: JSON.stringify({
+                  contents: [
+                    { role: 'user', parts: [{ text: `${systemPrompt}\n\nUser Question: ${prompt.trim()}` }] }
+                  ],
+                  generationConfig: { maxOutputTokens: 500, temperature: 0.7 }
+                })
+              });
+              const aiData = await aiRes.json();
+              if (aiRes.ok && aiData.candidates && aiData.candidates[0]?.content?.parts[0]?.text) {
+                const rawReply = aiData.candidates[0].content.parts[0].text;
+                const formattedHtml = rawReply
+                  .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                  .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                  .replace(/\n\n/g, '<br><br>')
+                  .replace(/\n/g, '<br>');
+
+                return res.json({
+                  success: true,
+                  isAiGenerated: true,
+                  modelUsed: model,
+                  replyHtml: formattedHtml,
+                  replyPlain: rawReply.replace(/[*#_]/g, '')
+                });
+              }
+            } catch (mErr) {
+              console.warn(`Model ${model} failed for chat, trying next:`, mErr.message);
+            }
+          }
+        }
+      } catch (geminiErr) {
+        console.warn('Gemini chat failed, using local reasoning fallback:', geminiErr);
+      }
+    }
+
+    // Dynamic contextual fallback if no API key is saved yet
+    let replyPlain = "";
+    let replyHtml = "";
+
+    if (liveCases.length > 0) {
+      const latest = liveCases[0];
+      replyPlain = `Found ${liveCases.length} case(s) in the ledger. Latest: Case #${latest.case_number} (${latest.fir_number || 'FIR'}), titled "${latest.description || 'Investigation'}" under status ${latest.case_status || 'Open'}. Add your free Gemini API Key in Admin for live AI reasoning.`;
+      replyHtml = `Found <strong>${liveCases.length} case(s)</strong> in the decentralized ledger.<br><br>&bull; <strong>Latest Case:</strong> #${latest.case_number} (${latest.fir_number || 'FIR'})<br>&bull; <strong>Status:</strong> ${latest.case_status || 'Open'}<br>&bull; <strong>Incident:</strong> ${latest.description || 'Under active investigation'}<br><br>💡 <em>Tip:</em> Add your free Gemini API Key in the <strong>Admin &rarr; API Keys</strong> tab to activate real-time AI reasoning.`;
+    } else {
+      replyPlain = `Understood. Currently 0 cases are registered in the Evidex ledger. You can file an FIR and upload evidence via the Register Case option.`;
+      replyHtml = `Understood. Currently <strong>0 cases</strong> are registered in the Evidex ledger.<br><br>Police officers can file a new FIR and seal evidence via the <strong>Register Case</strong> panel.<br><br>💡 <em>Tip:</em> Configure your free Google Gemini API key in <strong>Admin &rarr; API Keys</strong> to activate intelligent conversational responses.`;
+    }
+
+    return res.json({
+      success: true,
+      isAiGenerated: false,
+      replyHtml,
+      replyPlain
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

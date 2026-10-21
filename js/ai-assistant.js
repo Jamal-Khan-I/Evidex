@@ -681,7 +681,8 @@
     const storyControls = msgEl.querySelector('#aiStoryControls');
 
     let i = 0;
-    const speed = isStory ? 10 : 16; // Faster for long stories
+    const speed = 12; // Fast, snappy interval
+    const step = isStory ? 4 : 2; // Type multiple characters per tick for rapid response
 
     if (typewriterInterval) clearInterval(typewriterInterval);
 
@@ -698,9 +699,9 @@
 
     typewriterInterval = setInterval(() => {
       if (i < plainText.length) {
-        textContainer.textContent = plainText.substring(0, i + 1);
-        if (i % 3 === 0) playTypeBlip();
-        i++;
+        i = Math.min(plainText.length, i + step);
+        textContainer.textContent = plainText.substring(0, i);
+        if (i % 6 === 0) playTypeBlip();
         feed.scrollTop = feed.scrollHeight;
       } else {
         clearInterval(typewriterInterval);
@@ -726,12 +727,13 @@
     }, speed);
   }
 
-  // ── SMART CASE KNOWLEDGE ENGINE & STORYTELLING ──
+  // ── SMART CASE KNOWLEDGE ENGINE & REAL-TIME GEMINI AI ──
   async function generateAIAnswer(query) {
     const q = (query || '').toLowerCase().trim();
+    const role = window.currentUserRole || 'Officer';
 
     // 1. STORYTELLING REQUEST (Last Case Registered)
-    if (q.includes('story') || q.includes('last case') || q.includes('recent case') || q.includes('registered case') || q.includes('explain the case')) {
+    if (q.includes('story') || q.includes('last case') || q.includes('recent case') || q.includes('registered case') || q.includes('explain the case') || q.includes('explain about the last case')) {
       try {
         if (window.epsApi && typeof window.epsApi.analyzeCaseStory === 'function') {
           const res = await window.epsApi.analyzeCaseStory();
@@ -748,86 +750,31 @@
       }
     }
 
-    // Fetch live cases
-    let cases = [];
+    // 2. LIVE DYNAMIC CONVERSATIONAL AI VIA GEMINI (NO SCRIPTED / CANNED REPLIES)
     try {
-      if (window.epsApi && typeof window.epsApi.getCases === 'function') {
-        const role = window.currentUserRole || 'POLICE';
-        const res = await window.epsApi.getCases(role, 'all');
-        if (res && res.cases) cases = res.cases;
+      if (window.epsApi && typeof window.epsApi.askEvidexAi === 'function') {
+        const chatRes = await window.epsApi.askEvidexAi(query, role);
+        if (chatRes && chatRes.success && (chatRes.replyHtml || chatRes.replyPlain)) {
+          return {
+            isStory: false,
+            plain: chatRes.replyPlain,
+            html: chatRes.replyHtml
+          };
+        }
       }
     } catch (e) {
-      console.warn('AI could not fetch live cases:', e);
+      console.warn('Real-time Gemini chat error:', e);
     }
 
-    // 2. Summary query
-    if (q.includes('all cases') || q.includes('summarize') || q.includes('summary') || q.includes('how many cases')) {
-      if (cases.length === 0) {
-        return {
-          isStory: false,
-          plain: "There are currently 0 registered cases in the Evidex decentralized ledger. You can register a new FIR case from the 'Register Case' tab in the left sidebar.",
-          html: "There are currently <strong>0 registered cases</strong> in the Evidex decentralized ledger.<br><br>You can register a new FIR case from the <strong>Register Case</strong> option in the left navigation sidebar."
-        };
-      }
-      const pendingForensics = cases.filter(c => c.status === 'UNDER_FORENSIC_ANALYSIS' || c.status === 'FORENSIC_REQUESTED').length;
-      const courtCases = cases.filter(c => c.status === 'COURT_READY' || c.status === 'ADMITTED').length;
-      const recent = cases.slice(0, 3).map(c => `• <strong>${escapeHtml(c.case_number || c.fir_number || 'Case')}</strong>: ${escapeHtml(c.title || 'Evidence Dossier')} (${c.status || 'Active'})`).join('<br>');
-
-      return {
-        isStory: false,
-        plain: `Found ${cases.length} total cases in the Evidex ledger. ${pendingForensics} are under forensic analysis, and ${courtCases} are prepared for court presentation.\n\nRecent dossiers:\n${cases.slice(0, 3).map(c => `- ${c.case_number || c.fir_number}: ${c.title} (${c.status})`).join('\n')}`,
-        html: `Found <strong>${cases.length} registered case dossiers</strong> in the cryptographic ledger:<br><br>
-               📊 <strong>Status Breakdown:</strong><br>
-               &bull; Under Forensic Review: <strong>${pendingForensics}</strong><br>
-               &bull; Court-Admissible / Ready: <strong>${courtCases}</strong><br><br>
-               📁 <strong>Recent Records:</strong><br>${recent}`
-      };
-    }
-
-    // 3. Forensic Status Query
-    if (q.includes('forensic') || q.includes('lab') || q.includes('fsl') || q.includes('report')) {
-      const fslCases = cases.filter(c => c.status === 'UNDER_FORENSIC_ANALYSIS' || c.status === 'FORENSIC_REQUESTED' || c.has_forensics_report);
-      if (fslCases.length === 0) {
-        return {
-          isStory: false,
-          plain: "No cases are currently flagged for forensic lab examination. When registering a case, police officers can check 'Request Forensics Report' to schedule evidence analysis.",
-          html: "No cases are currently pending forensic lab examination.<br><br>💡 <em>Officer Tip:</em> When registering an FIR, check the <strong>'Request Forensics Report'</strong> checkbox to flag digital evidence for FSL laboratory analysis."
-        };
-      }
-      const list = fslCases.slice(0, 4).map(c => `• <strong>${escapeHtml(c.case_number || c.fir_number)}</strong>: ${escapeHtml(c.title)} &mdash; Status: <span style="color:#2563eb; font-weight:600;">${c.status}</span>`).join('<br>');
-      return {
-        isStory: false,
-        plain: `There are ${fslCases.length} case(s) involving forensic reports in the ledger.`,
-        html: `Found <strong>${fslCases.length} case(s)</strong> with forensic requirements:<br><br>${list}<br><br>Forensic specialists can accept custody, perform hash verification, and upload certified reports.`
-      };
-    }
-
-    // 4. Chain of Custody Query
-    if (q.includes('custody') || q.includes('chain') || q.includes('integrity') || q.includes('tamper')) {
-      return {
-        isStory: false,
-        plain: "Evidex secures evidence custody using SHA-256 cryptographic hashing and Ethereum Sepolia smart contracts. Every custody transfer is signed with MetaMask, creating an immutable, court-admissible audit trail.",
-        html: `⚖️ <strong>Chain of Custody &amp; Tamper Verification:</strong><br><br>
-               1. <strong>Cryptographic Fingerprint:</strong> Digital evidence is hashed client-side with SHA-256 before upload.<br>
-               2. <strong>Smart Contract Anchoring:</strong> The hash, officer ID, and timestamp are written directly to the Ethereum blockchain.<br>
-               3. <strong>Custody Transfers:</strong> When custody moves between Police, Forensic Labs, and Court, both parties sign the transfer transaction.<br>
-               4. <strong>Tamper Detection:</strong> Any 1-bit alteration in a file alters the SHA-256 hash, causing immediate integrity validation failure.`
-      };
-    }
-
-    // 5. Default intelligent response
+    // 3. Dynamic Local Fallback if server/network is offline
     return {
       isStory: false,
-      plain: `Understood, Officer. Evidex is operating with live Ethereum smart contracts and AES-256 client encryption. You can ask for a full story of the last registered case, query dossiers, or inspect chain of custody logs.`,
-      html: `Understood, Officer. <strong>Evidex AI</strong> is ready.<br><br>
-             &bull; <strong>Blockchain Network:</strong> Ethereum Sepolia<br>
-             &bull; <strong>Storage Node:</strong> Pinata IPFS Decentralized Cluster<br>
-             &bull; <strong>Active Cases:</strong> ${cases.length} registered dossiers<br><br>
-             Try asking: <em>"Story of the last case"</em>, <em>"Summarize all cases"</em>, or <em>"How does custody work?"</em>`
+      plain: "Understood, Officer. Evidex AI operates with live Ethereum Sepolia smart contracts and SHA-256 evidence integrity. Please ensure your Gemini API key is configured in Admin API Keys for live conversational intelligence.",
+      html: "Understood, Officer. <strong>Evidex AI</strong> is connected.<br><br>&bull; <strong>Blockchain:</strong> Ethereum Sepolia<br>&bull; <strong>Cryptographic Anchor:</strong> SHA-256 &amp; AES-GCM<br><br>💡 <em>Tip:</em> Add your free Google Gemini API Key in the <strong>Admin &rarr; API Keys</strong> tab to activate dynamic conversational intelligence without scripted replies."
     };
   }
 
-  // ── SUBMIT QUESTION HANDLER ──
+  // ── SUBMIT QUESTION HANDLER (FAST & RESPONSIVE) ──
   async function handleQuestionSubmit(queryText) {
     const text = queryText || (document.getElementById('aiPromptInput')?.value || '').trim();
     if (!text) return;
@@ -842,21 +789,16 @@
     setState('thinking');
     showThinkingIndicator();
 
-    const delay = 1600 + Math.random() * 600;
-    const answer = await new Promise(resolve => {
-      setTimeout(async () => {
-        const res = await generateAIAnswer(text);
-        resolve(res);
-      }, delay);
-    });
+    // Fast direct query without artificial sleep delays
+    const answer = await generateAIAnswer(text);
 
     // 2. Switch Avatar to NOTIFICATION ANIMATION (Blue dot)
     setState('notification');
 
-    // 3. Render answer in dialogue box with typewriter effect & voice
+    // 3. Render answer in dialogue box with snappy typewriter effect & voice
     setTimeout(() => {
       typewriteAssistantResponse(answer.html, answer.plain, answer.isStory);
-    }, 400);
+    }, 200);
   }
 
   // ── VOICE INPUT (WEB SPEECH API) ──

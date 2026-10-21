@@ -311,6 +311,20 @@
       } catch (err) {
         return { success: false, error: err.message };
       }
+    },
+
+    // Dynamic Conversational AI powered by Gemini & Live Blockchain context
+    async askEvidexAi(prompt, role = 'Officer', caseNumber = null) {
+      try {
+        const res = await fetch(`${API_BASE}/ai/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt, role, caseNumber })
+        });
+        return await res.json();
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
     }
   };
 

@@ -2072,7 +2072,6 @@ async function loadAdminUsersRoster() {
 // ═══════════════════════════════════════════════════════════════════
 async function loadAdminApiKeysPanel() {
   const geminiInput = document.getElementById("adminGeminiApiKey");
-  const openaiInput = document.getElementById("adminOpenaiApiKey");
   const badge = document.getElementById("aiKeyStatusBadge");
   const notice = document.getElementById("adminApiKeySaveNotice");
   if (notice) notice.innerHTML = "";
@@ -2081,7 +2080,6 @@ async function loadAdminApiKeysPanel() {
     const res = await window.epsApi.getAdminApiKeys();
     if (res && res.success) {
       if (geminiInput) geminiInput.value = res.geminiApiKey || localStorage.getItem("evidex_gemini_api_key") || "";
-      if (openaiInput) openaiInput.value = res.openaiApiKey || localStorage.getItem("evidex_openai_api_key") || "";
       if (badge) {
         if (res.hasGemini || geminiInput?.value) {
           badge.style.display = "inline-block";
@@ -2111,29 +2109,24 @@ function toggleApiKeyVisibility(inputId, btn) {
 
 async function saveAdminApiKeys() {
   const geminiInput = document.getElementById("adminGeminiApiKey");
-  const openaiInput = document.getElementById("adminOpenaiApiKey");
   const notice = document.getElementById("adminApiKeySaveNotice");
   const badge = document.getElementById("aiKeyStatusBadge");
 
   const geminiApiKey = (geminiInput?.value || "").trim();
-  const openaiApiKey = (openaiInput?.value || "").trim();
 
   if (geminiApiKey) localStorage.setItem("evidex_gemini_api_key", geminiApiKey);
   else localStorage.removeItem("evidex_gemini_api_key");
 
-  if (openaiApiKey) localStorage.setItem("evidex_openai_api_key", openaiApiKey);
-  else localStorage.removeItem("evidex_openai_api_key");
-
   try {
     if (notice) {
       notice.style.color = "#2563eb";
-      notice.textContent = "Saving API keys to database...";
+      notice.textContent = "Saving Gemini API key to database...";
     }
-    const res = await window.epsApi.saveAdminApiKeys({ geminiApiKey, openaiApiKey });
+    const res = await window.epsApi.saveAdminApiKeys({ geminiApiKey });
     if (res && res.success) {
       if (notice) {
         notice.style.color = "#16a34a";
-        notice.textContent = "✓ API Keys saved successfully! Evidex AI is now supercharged.";
+        notice.textContent = "✓ Gemini API Key saved successfully! Evidex AI is now active and intelligent.";
       }
       if (badge && geminiApiKey) {
         badge.style.display = "inline-block";
@@ -2149,7 +2142,7 @@ async function saveAdminApiKeys() {
   } catch (err) {
     if (notice) {
       notice.style.color = "#16a34a";
-      notice.textContent = "✓ API Keys saved to local session.";
+      notice.textContent = "✓ Gemini API Key saved to local session.";
     }
   }
 }
