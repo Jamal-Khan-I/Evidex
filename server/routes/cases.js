@@ -60,6 +60,35 @@ router.get('/', (req, res, next) => {
   }
 });
 
+// GET /api/cases/stats - Summary counts for the top dashboard pill (Cases / Pending / Verified)
+router.get('/stats', (req, res, next) => {
+  try {
+    const totalRow = db.get("SELECT COUNT(*) as count FROM cases");
+    const totalCases = totalRow ? totalRow.count : 0;
+
+    const pendingRow = db.get("SELECT COUNT(*) as count FROM cases WHERE case_status = 'OPEN'");
+    const pendingCases = pendingRow ? pendingRow.count : 0;
+
+    // Verified: count of verified cases or audit logs with integrity verified
+    const verifiedRow = db.get("SELECT COUNT(*) as count FROM cases WHERE case_status = 'VERIFIED' OR court_status = 'VERIFIED'");
+    let verifiedCount = verifiedRow ? verifiedRow.count : 0;
+
+    const auditVerifiedRow = db.get("SELECT COUNT(*) as count FROM audit_logs WHERE action = 'INTEGRITY_VERIFIED'");
+    if (auditVerifiedRow && auditVerifiedRow.count > 0) {
+      verifiedCount = Math.max(verifiedCount, auditVerifiedRow.count);
+    }
+
+    res.json({
+      success: true,
+      totalCases,
+      pendingCases,
+      verifiedCount
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/cases/:caseNumber - Full dossier for a single case
 router.get('/:caseNumber', (req, res, next) => {
   try {

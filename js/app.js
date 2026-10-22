@@ -2387,9 +2387,19 @@ async function loadStats() {
     countUp("statEvidence", total.toNumber());
     countUp("statTransfers", transfers.toNumber());
     countUp("statVerified", passes.toNumber());
-    countUp("wStatVerified", passes.toNumber());
-    countUp("wStatCases", total.toNumber());
   } catch (e) {}
+
+  if (window.epsApi && typeof window.epsApi.getCaseStats === 'function') {
+    try {
+      const statsRes = await window.epsApi.getCaseStats();
+      if (statsRes && statsRes.success) {
+        countUp("wStatCases", statsRes.totalCases || 0);
+        countUp("wStatPending", statsRes.pendingCases || 0);
+        countUp("wStatVerified", statsRes.verifiedCount || 0);
+        return;
+      }
+    } catch (e) {}
+  }
 
   if (window.epsApi) {
     try {
@@ -2401,6 +2411,7 @@ async function loadStats() {
       if (pendingRes && pendingRes.success) {
         countUp("wStatPending", pendingRes.count || 0);
       }
+      countUp("wStatVerified", 0);
     } catch (e) {}
   }
 }

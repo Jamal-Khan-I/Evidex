@@ -187,6 +187,15 @@
     },
 
     // ── ROLE-BASED CASE WORKFLOW APIS ──
+    async getCaseStats() {
+      try {
+        const res = await fetch(`${API_BASE}/cases/stats`);
+        return await res.json();
+      } catch (err) {
+        return { success: false, totalCases: 0, pendingCases: 0, verifiedCount: 0, error: err.message };
+      }
+    },
+
     async getCases(role = 'POLICE', filter = 'all', search = '') {
       try {
         const res = await fetch(`${API_BASE}/cases?role=${encodeURIComponent(role)}&filter=${encodeURIComponent(filter)}&search=${encodeURIComponent(search)}`);
