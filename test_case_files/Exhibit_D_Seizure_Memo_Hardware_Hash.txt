@@ -1,0 +1,28 @@
+DELHI POLICE CYBER CRIME CELL
+SEIZURE MEMO OF ELECTRONIC EVIDENCE (FORM NO. CC-22)
+Under Section 105 & Section 106 Bharatiya Nagarik Suraksha Sanhita (BNSS), 2023
+
+CASE NO: CASE-2026-001
+FIR NO: 001/2026 U/S 318(4), 316(2), 336(3), 61(2) BNS & 66D IT Act
+PLACE OF SEIZURE: Flat 402, Tower B, Cyber Green Residency, Sector 62, Noida (U.P.)
+DATE & TIME: 13th February 2026 at 04:30 AM IST
+
+INDEPENDENT WITNESSES (PANCHAS):
+1. Shri Alok Verma, s/o R.P. Verma, r/o Sector 62, Noida (IT Consultant)
+2. Smt. Sunita Das, w/o K.C. Das, r/o Sector 62, Noida (Bank Manager)
+
+ITEMS SEIZED IN-SITU & CRYPTOGRAPHICALLY SECURED:
+1. One (1) 128-Port Matrix GSM SIM Gateway (Model: ETERNITY GENX, S/N: MX-2026-8812) containing 84 active pre-activated SIM cards.
+2. One (1) Lenovo Legion Pro 7 Laptop (Intel Core i9, 32GB RAM, 1TB NVMe SSD).
+   - Acquired using Tableau T8u Forensic USB 3.0 Write Blocker into Raw DD Image.
+   - Master Disk SHA-256 Hash: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+3. Three (3) OnePlus 12 5G mobile handsets with spoofed caller ID apps (CallMaster Pro v3.2).
+4. One (1) Hardware Ledger Nano X Crypto Wallet containing seed phrases for TRC-20 USDT laundering addresses.
+
+TAMPER-PROOF PACKAGING:
+All items placed inside Faraday anti-static RF shielding bags (Bag Barcode Nos: DL-CYBER-BAG-091 to 094), sealed with tamper-evident serial tape and signed across by Panchas and IO.
+
+SEIZED BY:
+Inspector Vikramaditya Rathore (Investigating Officer)
+Cyber Crime Cell, New Delhi
+Badge: DL-CYBER-8841

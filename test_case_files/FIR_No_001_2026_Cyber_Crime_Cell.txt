@@ -1,0 +1,41 @@
+GOVERNMENT OF INDIA / STATE POLICE DEPARTMENT
+CYBER CRIME POLICE STATION (CENTRAL INVESTIGATION DIVISION)
+FIRST INFORMATION REPORT (FIR) - ELECTRONIC CRIMES DIVISION
+Under Sections 154 Cr.P.C. & Section 173 Bharatiya Nagarik Suraksha Sanhita (BNSS), 2023
+
+1. DISTRICT: Central Cyber Police Station, New Delhi
+2. FIR NUMBER: FIR No. 001/2026
+3. DATE & TIME OF REPORT: 14/02/2026 at 11:30 hrs
+4. CASE REFERENCE NUMBER: CASE-2026-001
+
+5. ACTS & SECTIONS INVOKED:
+   - Bharatiya Nyaya Sanhita (BNS), 2023:
+     * Section 318(4) - Cheating and dishonestly inducing delivery of property
+     * Section 316(2) - Criminal breach of trust by person holding public authority
+     * Section 336(3) - Forgery of valuable security, official seals, or court documents
+     * Section 61(2)  - Criminal conspiracy
+   - Information Technology Act, 2000:
+     * Section 43    - Penalty and compensation for damage to computer system
+     * Section 66C   - Punishment for identity theft
+     * Section 66D   - Punishment for cheating by personation by using computer resource
+   - Bharatiya Sakshya Adhiniyam, 2023 (BSA):
+     * Section 63    - Admissibility of Electronic Records
+
+6. COMPLAINANT PARTICULARS:
+   Name: Dr. Rameshwar Sharma (Retd. Senior Scientist, ICMR)
+   Address: Sector 14, R.K. Puram, New Delhi
+
+7. BRIEF FACTS OF THE CRIME ("DIGITAL ARREST" RACKET):
+   On 08/02/2026, the victim received an automated IVR call claiming to be from the Department of Telecommunications (DoT) alleging 17 illegal SIM cards registered under his Aadhaar were used in money laundering and narcotics smuggling. 
+   The call was transferred via Skype video conferencing to a simulated police station control room with suspects donning counterfeit IPS uniforms, displaying forged CBI badges, and showing simulated arrest warrants bearing fabricated Supreme Court digital watermarks.
+   The complainant was placed under continuous 96-hour coercive "Virtual Custody" ("Digital Arrest"), prohibited from disconnecting the video feed or contacting family. Under immense psychological coercion and threat of immediate incarceration, the victim was forced to liquidate mutual funds and fixed deposits, transferring ₹4,85,00,000/- (Rupees Four Crore Eighty-Five Lakhs) across four layer-1 mule bank accounts, subsequently bridged to Tether (USDT) cryptocurrency exchanges.
+
+8. PARTICULARS OF SEIZED DIGITAL EXHIBITS:
+   - Exhibit-A: 128-Port GSM SIM Box Gateway running cloned eSIM profiles
+   - Exhibit-B: Bank account ledger & Binance TRC-20 crypto wallet transaction hashes
+   - Exhibit-C: VoIP Deepfake voice cloning audio profile & frequency spectrum logs
+   - Exhibit-D: E01 forensic disk image of suspect command-and-control server (IP: 185.220.101.45)
+
+9. INVESTIGATING OFFICER:
+   Inspector Vikramaditya Rathore, Cyber Crime Division
+   Badge No: DL-CYBER-8841

@@ -1579,6 +1579,9 @@ async function openCaseDossier(caseNumber) {
 
   if (!modal || !body) return;
   modal.style.display = "flex";
+  requestAnimationFrame(() => {
+    modal.classList.add("active");
+  });
   title.textContent = `Case Dossier · ${caseNumber}`;
   body.innerHTML = `<div style="text-align:center; padding:40px; color:#64748b;">Loading case dossier from ledger...</div>`;
 
@@ -1586,17 +1589,68 @@ async function openCaseDossier(caseNumber) {
     zipBtn.onclick = () => downloadCaseZip(caseNumber);
   }
 
+  // Dismiss on clicking backdrop outside container
+  modal.onclick = (e) => {
+    if (e.target === modal) closeCaseDossierModal();
+  };
+
   try {
-    const res = await window.epsApi.getCaseDetails(caseNumber);
-    if (!res || !res.success) {
-      body.innerHTML = `<div style="color:var(--color-danger); padding:20px;">Could not load dossier: ${res?.error || 'Unknown error'}</div>`;
+    let res = null;
+    try {
+      res = await window.epsApi.getCaseDetails(caseNumber);
+    } catch (apiErr) {
+      console.warn("Backend getCaseDetails failed:", apiErr);
+    }
+
+    let c = res?.case || null;
+    let evidence = res?.evidence || [];
+    let forensics = res?.forensicReports || [];
+    let court = res?.courtReports || [];
+
+    // On-Chain ledger fallback if database is empty or offline
+    if ((!c || evidence.length === 0) && contract && typeof contract.getEvidenceIdsByCase === "function") {
+      try {
+        const onChainIds = await contract.getEvidenceIdsByCase(caseNumber);
+        if (onChainIds && onChainIds.length > 0) {
+          if (!c) {
+            c = {
+              case_number: caseNumber,
+              fir_number: 'Ledger Electronic Record',
+              police_station: 'Decentralized Smart Contract Ledger',
+              law_sections: 'BSA (2023) Section 63 Electronic Evidence',
+              officer_name: 'Investigating Officer',
+              case_status: 'OPEN',
+              forensics_status: 'NOT_REQUIRED',
+              court_status: 'PENDING'
+            };
+          }
+          if (evidence.length === 0) {
+            for (const id of onChainIds) {
+              try {
+                const ev = await contract.getEvidence(id);
+                evidence.push({
+                  evidence_id: id,
+                  file_name: id,
+                  file_size: null,
+                  file_hash: ev.fileHash,
+                  current_custodian: ev.registeredBy,
+                  created_at: Number(ev.registeredAt) * 1000
+                });
+              } catch (e) {}
+            }
+          }
+        }
+      } catch (onChainErr) {
+        console.warn("On-chain case fallback lookup notice:", onChainErr);
+      }
+    }
+
+    if (!c && evidence.length === 0) {
+      body.innerHTML = `<div style="color:var(--color-danger); padding:20px;">Could not load dossier: Records for <strong>${caseNumber}</strong> were not found in ledger or local storage.</div>`;
       return;
     }
 
-    const c = res.case || {};
-    const evidence = res.evidence || [];
-    const forensics = res.forensicReports || [];
-    const court = res.courtReports || [];
+    c = c || { case_number: caseNumber };
 
     subtitle.textContent = `${c.fir_number || 'FIR N/A'} · ${c.police_station || 'Police Station'} · ${c.law_sections || 'Legal Sections'}`;
 
@@ -1717,7 +1771,14 @@ async function openCaseDossier(caseNumber) {
 
 function closeCaseDossierModal() {
   const modal = document.getElementById("caseDossierModalBackdrop");
-  if (modal) modal.style.display = "none";
+  if (modal) {
+    modal.classList.remove("active");
+    setTimeout(() => {
+      if (!modal.classList.contains("active")) {
+        modal.style.display = "none";
+      }
+    }, 250);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -3403,7 +3464,8 @@ async function registerEvidence(btn) {
   const description = document.getElementById("regDescription").value.trim();
   const files = Array.from(document.getElementById("regFiles").files);
   const caseKey = document.getElementById("regCaseKey").value.trim();
-  document.getElementById("regUploadResult").innerHTML = "";
+  const regUploadEl = document.getElementById("regUploadResult");
+  if (regUploadEl) regUploadEl.innerHTML = "";
 
   if (files.length === 0 || !caseNumber || !firNumber) {
     showResult("regResult", "fail", "Case Number, FIR Number, and at least one file are required.");
@@ -3417,6 +3479,10 @@ async function registerEvidence(btn) {
     showResult("regResult", "fail", "Enter or generate a Case Encryption Key first — it's needed to encrypt these files.");
     return;
   }
+  if (!contract || !signer) {
+    showResult("regResult", "fail", "MetaMask wallet is not connected. Please click 'Connect Wallet' and authorize MetaMask.");
+    return;
+  }
 
   setBtnBusy(btn, true, `Preparing ${files.length} file(s)...`);
   const evidenceIds = [];
@@ -3425,8 +3491,6 @@ async function registerEvidence(btn) {
   const descriptions = [];
   let ipfsFailures = 0;
 
-  const uploadAnim = new UploadAnimationCard('regUploadResult', files);
-  uploadAnim.updateOverall(4, `Preparing cryptographic hashing & AES-256 derivation...`);
   setDropzoneCardProgress('regFiles', 6, 'Deriving AES-256 Case Key...');
 
   try {
@@ -3438,8 +3502,6 @@ async function registerEvidence(btn) {
       const fileBasePct = Math.round(10 + (i / files.length) * 75);
       const fileSlice = Math.round((1 / files.length) * 75);
 
-      uploadAnim.updateFile(i, 20, "Hashing SHA-256...");
-      uploadAnim.updateOverall(fileBasePct + fileSlice * 0.2, `Hashing ${file.name} (${i + 1}/${files.length})...`);
       showResult("regResult", "pending", `Hashing &amp; encrypting ${i + 1} of ${files.length}: ${file.name}...`);
       setDropzoneCardProgress('regFiles', fileBasePct + 2, `Hashing ${file.name} (SHA-256)...`);
       const dzBar = document.getElementById(`regFiles-bar-${i}`);
@@ -3448,8 +3510,6 @@ async function registerEvidence(btn) {
       if (dzStatus) dzStatus.textContent = 'Hashing SHA-256...';
 
       const fileHash = await hashFile(file);
-      uploadAnim.updateFile(i, 50, "Encrypting AES-256...");
-      uploadAnim.updateOverall(fileBasePct + fileSlice * 0.5, `Encrypting ${file.name} with Case Key...`);
       setDropzoneCardProgress('regFiles', fileBasePct + Math.round(fileSlice * 0.4), `Encrypting ${file.name} (AES-256)...`);
       if (dzBar) dzBar.style.width = '60%';
       if (dzStatus) dzStatus.textContent = 'Encrypting AES-256...';
@@ -3457,8 +3517,6 @@ async function registerEvidence(btn) {
       let ipfsCid = "";
       try {
         const encryptedBlob = await encryptFileForUpload(file, aesKey);
-        uploadAnim.updateFile(i, 78, "Pinning to IPFS...");
-        uploadAnim.updateOverall(fileBasePct + fileSlice * 0.8, `Uploading encrypted ${file.name} to IPFS...`);
         showResult("regResult", "pending", `Uploading ${i + 1} of ${files.length} to IPFS: ${file.name}...`);
         
         const uploadStart = performance.now();
@@ -3471,7 +3529,6 @@ async function registerEvidence(btn) {
         const speedMBps = ((file.size / (1024 * 1024)) / elapsedSec).toFixed(1);
         const speedText = parseFloat(speedMBps) > 0.05 ? `${speedMBps} MB/s` : `${(file.size / 1024 / elapsedSec).toFixed(1)} KB/s`;
 
-        uploadAnim.updateFile(i, 100, `Encrypted & Pinned ✓ (${speedText})`);
         setDropzoneCardProgress('regFiles', fileBasePct + fileSlice, `Pinned ${file.name} to IPFS`, speedText);
         if (dzBar) {
           dzBar.style.width = '100%';
@@ -3486,7 +3543,6 @@ async function registerEvidence(btn) {
         console.warn(`Encrypted IPFS upload failed for ${file.name} — registering with hash only.`, ipfsErr);
         ipfsFailures++;
         ipfsCid = "";
-        uploadAnim.updateFile(i, 100, "Hash registered (IPFS skipped)");
         if (dzBar) dzBar.style.width = '100%';
         if (dzStatus) dzStatus.textContent = 'Hash recorded';
       }
@@ -3497,31 +3553,21 @@ async function registerEvidence(btn) {
       descriptions.push(files.length > 1 ? `${description} (${file.name})` : description);
     }
 
-    uploadAnim.updateOverall(88, `Submitting batch registration on blockchain...`, "Filing to Blockchain");
-    showResult("regResult", "pending", `Submitting one transaction for ${files.length} file(s)...`);
-    setDropzoneCardProgress('regFiles', 90, 'Filing transaction on blockchain...');
-    let txHash = null;
-    let blockNumber = null;
-    let isTestBypass = false;
+    showResult("regResult", "pending", `Please confirm the registration transaction in MetaMask for ${files.length} file(s)...`);
+    setDropzoneCardProgress('regFiles', 90, 'Awaiting MetaMask signature...');
 
-    try {
-      const tx = files.length === 1
-        ? await contract.registerEvidence(evidenceIds[0], caseNumber, firNumber, policeStation, lawSections, descriptions[0], fileHashes[0], ipfsCids[0], caseKey)
-        : await contract.registerEvidenceBatch(evidenceIds, caseNumber, firNumber, policeStation, lawSections, descriptions, fileHashes, ipfsCids, caseKey);
-      const receipt = await tx.wait();
-      txHash = tx?.hash || null;
-      blockNumber = receipt?.blockNumber || null;
-    } catch (contractErr) {
-      console.warn("Smart contract registration failed (unregistered test wallet):", contractErr);
-      const isRoleErr = /caller does not have|execution reverted|revert|missing role|unauthorized/i.test(contractErr.message || "");
-      if (isRoleErr) {
-        isTestBypass = true;
-        txHash = "0xTEST_" + Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2, "0")).join("");
-        blockNumber = 7894561;
-      } else {
-        throw contractErr;
-      }
-    }
+    // Specifying gasLimit bypasses ethers local estimateGas revert so MetaMask ALWAYS triggers its popup
+    const gasLimit = files.length > 5 ? 1500000 : 850000;
+    const tx = files.length === 1
+      ? await contract.registerEvidence(evidenceIds[0], caseNumber, firNumber, policeStation, lawSections, descriptions[0], fileHashes[0], ipfsCids[0], caseKey, { gasLimit })
+      : await contract.registerEvidenceBatch(evidenceIds, caseNumber, firNumber, policeStation, lawSections, descriptions, fileHashes, ipfsCids, caseKey, { gasLimit });
+
+    showResult("regResult", "pending", `Transaction broadcast to Sepolia (TX: ${tx.hash.slice(0, 10)}...${tx.hash.slice(-8)}). Waiting for block confirmation...`);
+    setDropzoneCardProgress('regFiles', 95, 'Transaction submitted — awaiting block confirmation...');
+    
+    const receipt = await tx.wait();
+    const txHash = tx?.hash || receipt?.transactionHash;
+    const blockNumber = receipt?.blockNumber || 7894561;
 
     cacheCaseKeyLocally(caseNumber, caseKey);
 
@@ -3546,7 +3592,7 @@ async function registerEvidence(btn) {
       }
 
       for (let i = 0; i < evidenceIds.length; i++) {
-        window.epsApi.indexEvidence({
+        await window.epsApi.indexEvidence({
           id: evidenceIds[i],
           caseNumber,
           fileName: files[i]?.name || null,
@@ -3556,9 +3602,10 @@ async function registerEvidence(btn) {
           description: descriptions[i],
           submitterAddress: connectedAddress,
           currentCustodian: connectedAddress,
-          txHash: txHash
+          txHash: txHash,
+          blockNumber: blockNumber
         });
-        window.epsApi.logAudit("EVIDENCE_REGISTERED", connectedAddress, {
+        await window.epsApi.logAudit("EVIDENCE_REGISTERED", connectedAddress, {
           evidenceId: evidenceIds[i],
           caseNumber,
           fileHash: fileHashes[i],
@@ -3567,21 +3614,32 @@ async function registerEvidence(btn) {
       }
     }
 
-    uploadAnim.complete("Filed On-Chain ✓");
     completeDropzoneCard('regFiles', blockNumber);
 
     showResult("regResult", "ok",
-      `${files.length} evidence item(s) registered under ${caseNumber}.` +
-      (isTestBypass ? `<br><span style="color:#b45309; font-size:12px;"><strong>Notice:</strong> Smart contract role check was bypassed so your unregistered test wallet could complete this registration!</span>` : "") +
-      (ipfsFailures ? ` ${ipfsFailures} file(s) registered as hash-only — IPFS upload failed for those.` : "") +
+      `<strong>✓ Success:</strong> ${files.length} evidence item(s) registered on Ethereum Sepolia under <strong>${caseNumber}</strong>.<br>` +
+      `<span style="font-size:12px; font-family:var(--font-mono); color:#166534;">TX Hash: <a href="https://sepolia.etherscan.io/tx/${txHash}" target="_blank" style="color:#16a34a; text-decoration:underline;">${txHash.slice(0, 10)}...${txHash.slice(-8)}</a> · Block #${blockNumber}</span>` +
+      (ipfsFailures ? `<br><span style="color:#b45309; font-size:12px;">${ipfsFailures} file(s) registered as hash-only — IPFS upload failed for those.</span>` : "") +
       `<br><br><strong>Case Encryption Key:</strong><br>${caseKey}<br><span style="color:var(--ink-500);">Any role holder can now retrieve this automatically from the Case Evidence List — no need to note it down.</span>`
     );
     loadStats();
     if (typeof loadRolePendingCases === "function") loadRolePendingCases();
     if (typeof loadRoleAllCases === "function") loadRoleAllCases();
   } catch (err) {
-    if (uploadAnim) uploadAnim.destroy();
-    showResult("regResult", "fail", formatError(err));
+    console.error("registerEvidence error:", err);
+    const errMsg = err?.message || err?.toString() || "";
+    if (err?.code === 4001 || /user rejected|rejected transaction|denied transaction/i.test(errMsg)) {
+      showResult("regResult", "fail", "Transaction was rejected or cancelled in MetaMask.");
+    } else if (/caller does not have|execution reverted|revert|missing role|unauthorized|NotAuthorizedRole/i.test(errMsg)) {
+      showResult("regResult", "fail", `
+        <strong>Smart Contract Role Authorization Required:</strong><br>
+        Your connected wallet (<code>${connectedAddress}</code>) is not registered with the <strong>Investigator</strong> role on the Sepolia smart contract (<code>${CONTRACT_ADDRESS}</code>).<br><br>
+        • Please switch in MetaMask to an authorized Police wallet (e.g. <code>0x40386f4eC88BF501a562d4552Ef9fF6eAdfA69Da</code>), OR<br>
+        • Use the Admin Panel (Admin wallet <code>0x21815A6006830098c1aF1e8f1c2ce7793589CeEA</code>) to grant this wallet the Investigator role.
+      `);
+    } else {
+      showResult("regResult", "fail", formatError(err));
+    }
   } finally {
     setBtnBusy(btn, false);
   }

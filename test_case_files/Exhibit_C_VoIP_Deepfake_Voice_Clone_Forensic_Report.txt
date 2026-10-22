@@ -1,0 +1,27 @@
+CENTRAL FORENSIC SCIENCE LABORATORY (CFSL)
+AUDIO FORENSICS & ACOUSTIC BIOMETRICS DIVISION
+FORENSIC EXAMINATION REPORT (SECTION 63 BSA / SEC 65B IEA)
+
+Case Number: CASE-2026-001
+FIR Number: FIR No. 001/2026, Central Cyber PS
+Examining Forensic Officer: Dr. Ananya Sen, Senior Scientific Officer (Digital Forensics)
+Date of Examination: 16/02/2026
+
+EXAMINATION OF DIGITAL AUDIO ARTIFACT:
+Item Description: 4 recorded audio streams recovered from seized suspect laptop (Lenovo Legion, S/N: PF39X109)
+File Inspected: VoIP_IVR_CBI_Officer_VoiceClone.wav
+Calculated SHA-256 Hash: 9e3f7a1c8b2d4e6f0a5c8d3e2b1a9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a
+
+FORENSIC FINDINGS:
+1. SPECTROGRAPHIC ANALYSIS:
+   - High-frequency phase discontinuities detected at 3,200 Hz and 7,800 Hz intervals.
+   - Natural human pitch jitter (0.2% - 1.0%) was artificially synthesized at a uniform 0.04% variance, confirming text-to-speech neural vocoder synthesis (VITS / ElevenLabs API pipeline).
+   
+2. VOICE BIOMETRIC MATCH:
+   - The audio impersonated Shri Praveen Sood (Director, CBI) and ACP Crime Branch.
+   - Comparative acoustic resonance against authentic media samples yielded an 89.4% spectral match, indicating a fine-tuned RVC (Retrieval-based Voice Conversion) checkpoint trained on 42 minutes of public interview footage.
+
+CONCLUSION:
+The seized audio is a synthetic deepfake voice clone generated to psychologically terrorize the victim into compliance during the virtual custody ordeal.
+
+Chain of Custody Status: Sealed on Evidex Ethereum Sepolia Ledger with cryptographic timestamp.
