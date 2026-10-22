@@ -3496,13 +3496,44 @@ async function registerEvidence(btn) {
   try {
     const aesKey = await deriveCaseAesKey(caseNumber, caseKey);
 
+    setDropzoneCardProgress('regFiles', 8, 'Checking ledger for existing case evidence IDs...');
+    let existingCaseIds = [];
+    try {
+      if (contract && typeof contract.getEvidenceIdsByCase === "function") {
+        existingCaseIds = await contract.getEvidenceIdsByCase(caseNumber);
+      }
+    } catch (caseErr) {
+      console.warn("Could not fetch existing IDs for case:", caseErr);
+    }
+
+    let allEvidenceIds = [];
+    try {
+      if (contract && typeof contract.getAllEvidenceIds === "function") {
+        allEvidenceIds = await contract.getAllEvidenceIds();
+      }
+    } catch (allErr) {
+      console.warn("Could not fetch all evidence IDs:", allErr);
+    }
+
+    const takenIds = new Set([
+      ...existingCaseIds.map(id => String(id).trim().toUpperCase()),
+      ...allEvidenceIds.map(id => String(id).trim().toUpperCase())
+    ]);
+
+    let seq = 1;
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const evidenceId = `${idPrefix}-EV${String(i + 1).padStart(2, "0")}`;
+      while (takenIds.has(`${idPrefix.toUpperCase()}-EV${String(seq).padStart(2, "0")}`)) {
+        seq++;
+      }
+      const evidenceId = `${idPrefix}-EV${String(seq).padStart(2, "0")}`;
+      takenIds.add(evidenceId.toUpperCase());
+      seq++;
+
       const fileBasePct = Math.round(10 + (i / files.length) * 75);
       const fileSlice = Math.round((1 / files.length) * 75);
 
-      showResult("regResult", "pending", `Hashing &amp; encrypting ${i + 1} of ${files.length}: ${file.name}...`);
+      showResult("regResult", "pending", `Hashing & encrypting ${i + 1} of ${files.length}: ${file.name}...`);
       setDropzoneCardProgress('regFiles', fileBasePct + 2, `Hashing ${file.name} (SHA-256)...`);
       const dzBar = document.getElementById(`regFiles-bar-${i}`);
       const dzStatus = document.getElementById(`regFiles-rowstatus-${i}`);
@@ -3553,11 +3584,62 @@ async function registerEvidence(btn) {
       descriptions.push(files.length > 1 ? `${description} (${file.name})` : description);
     }
 
+    showResult("regResult", "pending", `Pre-validating ${files.length} evidence file(s) on Sepolia smart contract...`);
+    setDropzoneCardProgress('regFiles', 88, 'Simulating transaction...');
+
+    // Pre-flight static simulation check to ensure MetaMask simulation will succeed 100%
+    try {
+      if (files.length === 1) {
+        await contract.registerEvidence.staticCall(
+          evidenceIds[0], caseNumber, firNumber, policeStation, lawSections, descriptions[0], fileHashes[0], ipfsCids[0], caseKey
+        );
+      } else {
+        await contract.registerEvidenceBatch.staticCall(
+          evidenceIds, caseNumber, firNumber, policeStation, lawSections, descriptions, fileHashes, ipfsCids, caseKey
+        );
+      }
+    } catch (simErr) {
+      console.warn("Pre-flight static simulation check returned:", simErr);
+      const errStr = (simErr?.data || simErr?.message || "").toString();
+
+      // If collision occurred (0xaccbcef2 / EvidenceAlreadyExists), generate guaranteed unique timestamped IDs
+      if (errStr.includes("0xaccbcef2") || /evidencealreadyexists/i.test(errStr)) {
+        console.warn("Evidence ID collision detected in simulation. Regenerating with timestamp salt...");
+        const timeSalt = Date.now().toString(36).slice(-4).toUpperCase();
+        for (let k = 0; k < evidenceIds.length; k++) {
+          evidenceIds[k] = `${idPrefix}-EV${String(k + 1).padStart(2, "0")}-${timeSalt}`;
+        }
+        // Validate regenerated IDs via staticCall
+        if (files.length === 1) {
+          await contract.registerEvidence.staticCall(
+            evidenceIds[0], caseNumber, firNumber, policeStation, lawSections, descriptions[0], fileHashes[0], ipfsCids[0], caseKey
+          );
+        } else {
+          await contract.registerEvidenceBatch.staticCall(
+            evidenceIds, caseNumber, firNumber, policeStation, lawSections, descriptions, fileHashes, ipfsCids, caseKey
+          );
+        }
+      } else if (errStr.includes("0xd20b41bf") || /onlyrole|unauthorized|notauthorized/i.test(errStr)) {
+        throw new Error(`Your wallet (${connectedAddress.slice(0, 6)}...${connectedAddress.slice(-4)}) is not registered with the Police / Investigator role on this smart contract. Please switch to an authorized Police account in MetaMask.`);
+      } else {
+        throw new Error("Smart contract pre-validation failed: " + formatError(simErr));
+      }
+    }
+
+    // Dynamic gas estimation with safety margin
+    let gasLimit;
+    try {
+      const estimated = files.length === 1
+        ? await contract.registerEvidence.estimateGas(evidenceIds[0], caseNumber, firNumber, policeStation, lawSections, descriptions[0], fileHashes[0], ipfsCids[0], caseKey)
+        : await contract.registerEvidenceBatch.estimateGas(evidenceIds, caseNumber, firNumber, policeStation, lawSections, descriptions, fileHashes, ipfsCids, caseKey);
+      gasLimit = (estimated * 130n) / 100n;
+    } catch {
+      gasLimit = files.length > 5 ? 1500000n : 850000n;
+    }
+
     showResult("regResult", "pending", `Please confirm the registration transaction in MetaMask for ${files.length} file(s)...`);
     setDropzoneCardProgress('regFiles', 90, 'Awaiting MetaMask signature...');
 
-    // Specifying gasLimit bypasses ethers local estimateGas revert so MetaMask ALWAYS triggers its popup
-    const gasLimit = files.length > 5 ? 1500000 : 850000;
     const tx = files.length === 1
       ? await contract.registerEvidence(evidenceIds[0], caseNumber, firNumber, policeStation, lawSections, descriptions[0], fileHashes[0], ipfsCids[0], caseKey, { gasLimit })
       : await contract.registerEvidenceBatch(evidenceIds, caseNumber, firNumber, policeStation, lawSections, descriptions, fileHashes, ipfsCids, caseKey, { gasLimit });
@@ -3630,7 +3712,9 @@ async function registerEvidence(btn) {
     const errMsg = err?.message || err?.toString() || "";
     if (err?.code === 4001 || /user rejected|rejected transaction|denied transaction/i.test(errMsg)) {
       showResult("regResult", "fail", "Transaction was rejected or cancelled in MetaMask.");
-    } else if (/caller does not have|execution reverted|revert|missing role|unauthorized|NotAuthorizedRole/i.test(errMsg)) {
+    } else if (/0xaccbcef2|EvidenceAlreadyExists/i.test(errMsg)) {
+      showResult("regResult", "fail", "Evidence items under this Case Number were already recorded on the blockchain ledger. A unique suffix will be used on the next attempt.");
+    } else if (/caller does not have|missing role|unauthorized|NotAuthorizedRole|0xd20b41bf/i.test(errMsg)) {
       showResult("regResult", "fail", `
         <strong>Smart Contract Role Authorization Required:</strong><br>
         Your connected wallet (<code>${connectedAddress}</code>) is not registered with the <strong>Investigator</strong> role on the Sepolia smart contract (<code>${CONTRACT_ADDRESS}</code>).<br><br>
