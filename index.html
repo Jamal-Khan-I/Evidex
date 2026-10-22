@@ -679,23 +679,23 @@
       <!-- PANEL 13: ADMIN - API KEYS CONFIGURATION -->
       <div class="workspace-panel" id="panel-admin-apikeys">
         <div class="panel-card" style="padding: 24px;">
-          <!-- Google Gemini API Key Section -->
+          <!-- Groq AI API Key Section -->
           <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-              <label for="adminGeminiApiKey" style="font-size: 13.5px; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 18px;">✨</span> Google Gemini API Key
-                <span id="geminiActiveBadge" style="font-size: 11px; font-weight: 700; border-radius: 10px; padding: 2px 9px; display: inline-flex; align-items: center; gap: 4px; background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; transition: all 0.2s ease;">Inactive</span>
+              <label for="adminGroqApiKey" style="font-size: 13.5px; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 18px;">⚡</span> Groq AI API Key (Ultra-Fast LPU Engine)
+                <span id="groqActiveBadge" style="font-size: 11px; font-weight: 700; border-radius: 10px; padding: 2px 9px; display: inline-flex; align-items: center; gap: 4px; background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; transition: all 0.2s ease;">Inactive</span>
               </label>
-              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" style="font-size: 12px; color: #2563eb; text-decoration: none; font-weight: 600;">
-                Get free key at Google AI Studio &rarr;
+              <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer" style="font-size: 12px; color: #f97316; text-decoration: none; font-weight: 600;">
+                Get free key at Groq Console &rarr;
               </a>
             </div>
             <p style="font-size: 12.5px; color: #64748b; margin-bottom: 12px; line-height: 1.5;">
-              Powers Evidex AI to understand user questions intelligently, analyze registered case dossiers in real-time, reconstruct multi-chapter investigative stories from start to end, and provide spoken briefings.
+              Powers Evidex AI with ultra-fast LPU inference (GPT-OSS 120B / 20B). Enables full conversational intelligence on any topic, live blockchain case analysis, and investigative storytelling without canned or scripted answers.
             </p>
             <div style="display: flex; gap: 10px;">
-              <input type="password" id="adminGeminiApiKey" placeholder="AIzaSy..." style="flex: 1; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-family: monospace; font-size: 13px;" />
-              <button type="button" class="btn-secondary" onclick="toggleApiKeyVisibility('adminGeminiApiKey', this)" style="padding: 0 14px;">Show</button>
+              <input type="password" id="adminGroqApiKey" placeholder="gsk_..." style="flex: 1; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-family: monospace; font-size: 13px;" />
+              <button type="button" class="btn-secondary" onclick="toggleApiKeyVisibility('adminGroqApiKey', this)" style="padding: 0 14px;">Show</button>
             </div>
           </div>
 

@@ -295,7 +295,7 @@
       }
     },
 
-    async testApiKey(key, provider = 'gemini') {
+    async testApiKey(key, provider = 'groq') {
       try {
         const res = await fetch(`${API_BASE}/ai/test-key`, {
           method: 'POST',
@@ -308,7 +308,7 @@
       }
     },
 
-    // AI Case Story analysis & generation
+    // AI Case Story analysis & generation (Powered by Groq)
     async analyzeCaseStory(caseNumber) {
       try {
         const res = await fetch(`${API_BASE}/ai/analyze-case`, {
@@ -322,7 +322,7 @@
       }
     },
 
-    // Dynamic Conversational AI powered by Gemini & Live Blockchain context
+    // Dynamic Conversational AI powered by Groq & Live Blockchain context
     async askEvidexAi(prompt, role = 'Officer', caseNumber = null) {
       try {
         const res = await fetch(`${API_BASE}/ai/chat`, {

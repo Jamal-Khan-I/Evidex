@@ -72,15 +72,17 @@ router.use('/profile', profileRoutes);
 router.use('/auth', authRoutes);
 router.use('/cases', casesRoutes);
 
-// ── ADMIN API KEYS CONFIGURATION ──
+// ── ADMIN API KEYS CONFIGURATION (GROQ AI ENGINE) ──
 router.get('/admin/api-keys', (req, res) => {
   try {
-    const geminiRow = db.get("SELECT value FROM system_settings WHERE key = 'gemini_api_key'");
-    const geminiKey = (geminiRow ? geminiRow.value : '') || process.env.GEMINI_API_KEY || '';
+    const groqRow = db.get("SELECT value FROM system_settings WHERE key = 'groq_api_key'");
+    const groqKey = (groqRow ? groqRow.value : '') || process.env.GROQ_API_KEY || '';
     res.json({
       success: true,
-      geminiApiKey: geminiKey,
-      hasGemini: !!geminiKey
+      groqApiKey: groqKey,
+      hasGroq: !!groqKey,
+      apiKey: groqKey,
+      geminiApiKey: groqKey // Backward compatibility
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -89,28 +91,88 @@ router.get('/admin/api-keys', (req, res) => {
 
 router.post('/admin/api-keys', (req, res) => {
   try {
-    const { geminiApiKey } = req.body;
+    const { groqApiKey, apiKey, geminiApiKey } = req.body;
+    const targetKey = (groqApiKey !== undefined ? groqApiKey : (apiKey !== undefined ? apiKey : geminiApiKey)) || '';
     const now = new Date().toISOString();
-    if (geminiApiKey !== undefined) {
-      db.run("INSERT OR REPLACE INTO system_settings (key, value, updated_at) VALUES ('gemini_api_key', ?, ?)", [geminiApiKey.trim(), now]);
-      process.env.GEMINI_API_KEY = geminiApiKey.trim();
-    }
-    res.json({ success: true, message: 'Gemini API key saved successfully.' });
+    
+    // Store Groq key in SQLite system_settings
+    db.run("INSERT OR REPLACE INTO system_settings (key, value, updated_at) VALUES ('groq_api_key', ?, ?)", [targetKey.trim(), now]);
+    process.env.GROQ_API_KEY = targetKey.trim();
+
+    // Clean up any deprecated keys
+    try {
+      db.run("DELETE FROM system_settings WHERE key = 'gemini_api_key'");
+    } catch (e) {}
+
+    res.json({ success: true, message: 'Groq API key saved successfully.' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-function getGeminiApiKey() {
+function getGroqApiKey() {
   try {
-    const row = db.get("SELECT value FROM system_settings WHERE key = 'gemini_api_key'");
+    const row = db.get("SELECT value FROM system_settings WHERE key = 'groq_api_key'");
     if (row && row.value && row.value.trim()) return row.value.trim();
   } catch (e) {}
-  return (process.env.GEMINI_API_KEY || '').trim();
+  return (process.env.GROQ_API_KEY || '').trim();
 }
+
+// Backward-compatible alias
+const getGeminiApiKey = getGroqApiKey;
 
 function generateLocalContextualAnswer(prompt, liveCases, liveEvidence, liveAudit, role) {
   const q = (prompt || '').toLowerCase().trim();
+
+  // 0. NATURAL CONVERSATIONAL & CASUAL CHAT (Greetings, wellbeing, identity, appreciation)
+  if (
+    q === 'how are you' ||
+    q.includes('how are you') ||
+    q.includes("how're you") ||
+    q.includes('how do you do') ||
+    q.includes('how is it going') ||
+    q.includes('hows it going')
+  ) {
+    const p = `I'm doing great, Officer! Thank you for asking. I am standing by, fully active and ready to assist you with case dossiers, digital evidence verification, chain of custody tracking, or any questions you have today. How can I help you right now?`;
+    const h = `I'm doing great, Officer! Thank you for asking.<br><br>I am <strong>EVIDEX AI</strong>, standing by, fully active and ready to assist you with case dossiers, digital evidence verification, chain of custody tracking, or any questions you have today.<br><br>How can I help you right now?`;
+    return { plain: p, html: h };
+  }
+
+  if (
+    q === 'hi' ||
+    q === 'hello' ||
+    q === 'hey' ||
+    q.startsWith('hello') ||
+    q.startsWith('hi ') ||
+    q.startsWith('hey ') ||
+    q.includes('good morning') ||
+    q.includes('good afternoon') ||
+    q.includes('good evening')
+  ) {
+    const p = `Hello, Officer! I am EVIDEX AI, your decentralized legal intelligence assistant and cyber-forensic investigator. How can I assist your investigation or answer your questions today?`;
+    const h = `Hello, Officer! I am <strong>EVIDEX AI</strong>, your decentralized legal intelligence assistant.<br><br>How can I assist your investigation or answer your questions today?`;
+    return { plain: p, html: h };
+  }
+
+  if (
+    q.includes('who are you') ||
+    q.includes('what are you') ||
+    q.includes('your name')
+  ) {
+    const p = `I am EVIDEX AI, an intelligent legal and cyber-forensics assistant powered by Groq ultra-fast neural inference. I monitor the Ethereum Sepolia chain of custody, verify cryptographic SHA-256 evidence integrity, narrate investigative case stories, and can answer questions on any topic.`;
+    const h = `I am <strong>EVIDEX AI</strong>, an intelligent legal and cyber-forensics assistant powered by <strong>Groq ultra-fast neural inference</strong>.<br><br>&bull; <strong>Blockchain Monitor:</strong> Ethereum Sepolia smart contract ledger<br>&bull; <strong>Forensics:</strong> Cryptographic SHA-256 evidence integrity<br>&bull; <strong>Jurisprudence:</strong> Bharatiya Nyaya Sanhita (BNS) &amp; IT Act 2000<br>&bull; <strong>Versatile Intelligence:</strong> Ready to answer whatever questions you have on any topic.`;
+    return { plain: p, html: h };
+  }
+
+  if (
+    q.includes('thank you') ||
+    q.includes('thanks') ||
+    q.includes('appreciate it')
+  ) {
+    const p = `You're very welcome, Officer! It's my pleasure to assist. Feel free to ask anytime if you need case analysis, forensic integrity verification, or answers to any other questions.`;
+    const h = `You're very welcome, Officer! It's my pleasure to assist.<br><br>Feel free to ask anytime if you need case analysis, forensic integrity verification, or answers to any other questions.`;
+    return { plain: p, html: h };
+  }
 
   let casesCount = liveCases.length;
   try {
@@ -338,128 +400,120 @@ You can ask me:
   return { plain: p, html: h };
 }
 
-// Dynamic Gemini Model Discovery (Queries Google ListModels directly for active models on caller's key)
-async function getAvailableGeminiModels(apiKey) {
+// ── GROQ DYNAMIC MODEL DISCOVERY & LPU INFERENCE ──
+async function getAvailableGroqModels(apiKey) {
   const cleanKey = (apiKey || '').trim();
-  if (!cleanKey) return { success: false, error: 'API key is empty' };
+  if (!cleanKey) return { success: false, error: 'Groq API key is empty' };
 
-  const versions = ['v1beta', 'v1'];
-  let lastError = null;
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/models', {
+      headers: {
+        'Authorization': `Bearer ${cleanKey}`,
+        'Content-Type': 'application/json'
+      },
+      signal: AbortSignal.timeout(7000)
+    });
+    const data = await res.json();
 
-  for (const ver of versions) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/${ver}/models?key=${encodeURIComponent(cleanKey)}`;
-      const res = await fetch(url, {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': cleanKey
-        },
-        signal: AbortSignal.timeout(6000)
-      });
-      const data = await res.json();
-
-      if (res.ok && data.models && Array.isArray(data.models) && data.models.length > 0) {
-        // Filter models that support generateContent and exclude non-chat models
-        const supported = data.models.filter(m => {
-          const name = (m.name || '').toLowerCase();
-          const canGen = !m.supportedGenerationMethods || m.supportedGenerationMethods.includes('generateContent');
-          const isNotSpecial = !name.includes('-tts') && !name.includes('-image') && !name.includes('embedding') && !name.includes('transcribe') && !name.includes('clip') && !name.includes('lyria') && !name.includes('robotics');
-          return canGen && isNotSpecial;
-        });
-
-        if (supported.length > 0) {
-          // Sort to prioritize latest and fastest flash models
-          const sorted = [...supported].sort((a, b) => {
-            const aName = (a.name || '').toLowerCase();
-            const bName = (b.name || '').toLowerCase();
-            const priority = ['gemini-flash-latest', 'gemini-3.8-flash', 'gemini-flash-lite-latest', 'gemini-3.5-flash'];
-            const aIdx = priority.findIndex(p => aName.endsWith('/' + p) || aName === p);
-            const bIdx = priority.findIndex(p => bName.endsWith('/' + p) || bName === p);
-            if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
-            if (aIdx !== -1) return -1;
-            if (bIdx !== -1) return 1;
-            return bName.localeCompare(aName);
-          });
-
-          const modelNames = sorted.map(m => m.name.startsWith('models/') ? m.name.substring(7) : m.name);
-          return {
-            success: true,
-            version: ver,
-            models: modelNames,
-            bestModel: modelNames[0],
-            displayName: sorted[0].displayName || modelNames[0]
-          };
-        }
-      } else if (!res.ok) {
-        lastError = data.error?.message || `HTTP ${res.status}: Failed to query Google AI models`;
-        if (data.error?.status === 'PERMISSION_DENIED' || data.error?.status === 'UNAUTHENTICATED' || (data.error?.code === 400 && data.error?.message?.includes('API key not valid'))) {
-          return { success: false, error: data.error?.message || 'Invalid Gemini API key' };
-        }
-      }
-    } catch (e) {
-      lastError = e.message;
+    if (!res.ok) {
+      return {
+        success: false,
+        error: data.error?.message || `HTTP ${res.status}: Invalid Groq API key or unauthorized`
+      };
     }
-  }
 
-  return { success: false, error: lastError || 'Unable to connect to Google Gemini. Please check your API key.' };
+    if (data && data.data && Array.isArray(data.data)) {
+      const allIds = data.data.map(m => m.id);
+      const chatPriority = [
+        'openai/gpt-oss-120b',
+        'openai/gpt-oss-20b',
+        'llama-3.3-70b-versatile',
+        'llama-3.1-70b-versatile',
+        'llama-3.1-8b-instant',
+        'qwen/qwen3.8-27b',
+        'allam-2-7b',
+        'mixtral-8x7b-32768',
+        'gemma2-9b-it'
+      ];
+
+      const available = chatPriority.filter(m => allIds.includes(m));
+      const others = allIds.filter(id => !available.includes(id) && !id.includes('whisper') && !id.includes('guard'));
+      const finalModels = [...available, ...others];
+
+      if (finalModels.length > 0) {
+        return {
+          success: true,
+          models: finalModels,
+          bestModel: finalModels[0]
+        };
+      }
+    }
+    return { success: false, error: 'No chat-compatible models found for this Groq key' };
+  } catch (e) {
+    return { success: false, error: e.message || 'Unable to connect to Groq API. Please check your network or key.' };
+  }
 }
 
+// ── TEST GROQ API KEY ──
 router.post('/ai/test-key', async (req, res) => {
   try {
     const { key } = req.body;
-    if (!key) return res.status(400).json({ success: false, error: 'API key is required' });
+    if (!key) return res.status(400).json({ success: false, error: 'Groq API key is required' });
 
-    const discovery = await getAvailableGeminiModels(key);
+    const discovery = await getAvailableGroqModels(key);
     if (!discovery.success) {
       return res.status(400).json({
         success: false,
-        error: discovery.error || 'Invalid Gemini API key or connection failed'
+        error: discovery.error || 'Invalid Groq API key or connection failed'
       });
     }
 
-    const ver = discovery.version || 'v1beta';
-    let lastGenError = null;
+    const modelsToTry = discovery.models.slice(0, 3);
+    let lastError = null;
 
-    // Test top active models returned by Google for this key
-    for (const model of discovery.models.slice(0, 5)) {
+    for (const model of modelsToTry) {
       try {
-        const genUrl = `https://generativelanguage.googleapis.com/${ver}/models/${model}:generateContent?key=${encodeURIComponent(key.trim())}`;
-        const genRes = await fetch(genUrl, {
+        const testRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': key.trim()
+            'Authorization': `Bearer ${key.trim()}`,
+            'Content-Type': 'application/json'
           },
           signal: AbortSignal.timeout(8000),
           body: JSON.stringify({
-            contents: [{ parts: [{ text: 'Respond with OK' }] }]
+            model,
+            messages: [
+              { role: 'user', content: 'Respond with OK' }
+            ],
+            max_tokens: 15
           })
         });
-        const genData = await genRes.json();
-        if (genRes.ok) {
+
+        const data = await testRes.json();
+        if (testRes.ok && data.choices && data.choices.length > 0) {
           return res.json({
             success: true,
-            message: `Google Gemini verified successfully! (Active Model: ${model})`,
+            message: `Groq AI verified successfully! (Ultra-Fast LPU Engine active: ${model})`,
             model
           });
         } else {
-          lastGenError = genData.error?.message || 'Generation failed';
+          lastError = data.error?.message || 'Chat generation test failed';
         }
       } catch (e) {
-        lastGenError = e.message;
+        lastError = e.message;
       }
     }
 
     return res.status(400).json({
       success: false,
-      error: lastGenError || 'Failed to generate response with available Gemini models'
+      error: lastError || 'Failed to complete test inference on Groq'
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// ── AI CASE STORY ANALYSIS ──
+// ── AI CASE STORY ANALYSIS (POWERED BY GROQ) ──
 router.post('/ai/analyze-case', async (req, res) => {
   try {
     const { caseNumber } = req.body;
@@ -481,7 +535,7 @@ router.post('/ai/analyze-case', async (req, res) => {
     const evidenceList = db.all("SELECT * FROM evidence_records WHERE case_number = ?", [targetCase.case_number]) || [];
     const auditLogs = db.all("SELECT * FROM audit_logs WHERE case_number = ? ORDER BY id ASC", [targetCase.case_number]) || [];
 
-    const apiKey = getGeminiApiKey();
+    const apiKey = getGroqApiKey();
 
     if (apiKey) {
       try {
@@ -512,56 +566,52 @@ REQUIREMENTS:
 2. Narrate the investigative story with a clear, articulate, professional Indian legal narrative voice, addressing the officer respectfully ('Officer' or 'Sir').
 3. Keep the narration concise (~250-320 words) so it is perfect for voice narration.`;
 
-        let candidateModels = ['gemini-flash-latest', 'gemini-3.8-flash', 'gemini-flash-lite-latest', 'gemini-3.5-flash'];
-        let ver = 'v1beta';
-        try {
-          const discovery = await getAvailableGeminiModels(apiKey);
-          if (discovery.success && discovery.models && discovery.models.length > 0) {
-            candidateModels = discovery.models.slice(0, 5);
-            ver = discovery.version || 'v1beta';
-          }
-        } catch (discErr) {}
+        const candidateModels = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'llama-3.3-70b-versatile'];
 
         for (const model of candidateModels) {
-            try {
-              const url = `https://generativelanguage.googleapis.com/${ver}/models/${model}:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
-              const aiRes = await fetch(url, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'x-goog-api-key': apiKey.trim()
-                },
-                signal: AbortSignal.timeout(20000),
-                body: JSON.stringify({
-                  contents: [{ parts: [{ text: prompt }] }],
-                  generationConfig: { maxOutputTokens: 800, temperature: 0.7 }
-                })
-              });
-              const aiData = await aiRes.json();
-              if (aiRes.ok && aiData.candidates && aiData.candidates[0]?.content?.parts[0]?.text) {
-                const rawStory = aiData.candidates[0].content.parts[0].text;
-                const formattedHtml = rawStory
-                  .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                  .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                  .replace(/\n\n/g, '<br><br>')
-                  .replace(/\n/g, '<br>');
+          try {
+            const aiRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${apiKey.trim()}`,
+                'Content-Type': 'application/json'
+              },
+              signal: AbortSignal.timeout(20000),
+              body: JSON.stringify({
+                model,
+                messages: [
+                  { role: 'system', content: 'You are Evidex AI, an elite legal intelligence assistant and criminal forensic investigator. Narrate compelling, professional, accurate case stories.' },
+                  { role: 'user', content: prompt }
+                ],
+                temperature: 0.7,
+                max_tokens: 1000
+              })
+            });
+            const aiData = await aiRes.json();
+            if (aiRes.ok && aiData.choices && aiData.choices[0]?.message?.content) {
+              const rawStory = aiData.choices[0].message.content;
+              const formattedHtml = rawStory
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/\n\n/g, '<br><br>')
+                .replace(/\n/g, '<br>');
 
-                return res.json({
-                  success: true,
-                  isAiGenerated: true,
-                  modelUsed: model,
-                  caseNumber: targetCase.case_number,
-                  title: targetCase.title || targetCase.description,
-                  storyHtml: formattedHtml,
-                  storyPlain: rawStory.replace(/[*#_]/g, '')
-                });
-              }
-            } catch (mErr) {
-              console.warn(`Model ${model} failed, trying next candidate:`, mErr.message);
+              return res.json({
+                success: true,
+                isAiGenerated: true,
+                modelUsed: model,
+                caseNumber: targetCase.case_number,
+                title: targetCase.title || targetCase.description,
+                storyHtml: formattedHtml,
+                storyPlain: rawStory.replace(/[*#_]/g, '')
+              });
             }
+          } catch (mErr) {
+            console.warn(`Groq model ${model} failed for story, trying next candidate:`, mErr.message);
           }
-      } catch (geminiErr) {
-        console.warn('Gemini API call failed, falling back to local story engine:', geminiErr);
+        }
+      } catch (groqErr) {
+        console.warn('Groq API call failed, falling back to local story engine:', groqErr);
       }
     }
 
@@ -598,7 +648,7 @@ The complete cryptographic dossier is locked and admissible under electronic jud
   }
 });
 
-// ── CONVERSATIONAL AI CHAT (POWERED BY GEMINI & LIVE BLOCKCHAIN CONTEXT) ──
+// ── CONVERSATIONAL AI CHAT (POWERED BY GROQ ULTRA-FAST LPU ENGINE) ──
 router.post('/ai/chat', async (req, res) => {
   try {
     const { prompt, role } = req.body;
@@ -606,7 +656,7 @@ router.post('/ai/chat', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Prompt is required' });
     }
 
-    const apiKey = getGeminiApiKey();
+    const apiKey = getGroqApiKey();
 
     // Fetch live system context from SQLite
     let liveCases = [];
@@ -626,39 +676,22 @@ router.post('/ai/chat', async (req, res) => {
 
     if (apiKey) {
       try {
-        const systemPrompt = `You are EVIDEX AI, an elite legal intelligence assistant and cyber-forensic criminal investigator built into the Evidex Decentralized Evidence Protection & Chain of Custody System (handling Indian legal standards, BNS, IT Act 2000, and Police Station evidence custody).
-Persona & Vocal Style: Professional, articulate, clear Indian English legal intelligence specialist. Address the officer respectfully ('Officer' or 'Sir'). Speak with clarity, polite composure, and natural pronunciation.
+        const systemPrompt = `You are EVIDEX AI, a versatile, articulate, and brilliant conversational AI assistant. You have full conversational intelligence like ChatGPT, Claude, and Gemini.
 
-EVIDEX SYSTEM ARCHITECTURE & USER WORKFLOWS:
-1. HOW TO REGISTER A CASE IN EVIDEX:
-   - Connect Police Officer MetaMask wallet (authorized by Admin).
-   - Navigate to the 'Register Case' tab on the top navigation bar.
-   - Enter FIR Number (e.g. FIR-2024-CH01), Police Station jurisdiction, Incident Description, and statutory sections under Bharatiya Nyaya Sanhita (BNS) & IT Act 2000.
-   - Attach digital exhibits (CCTV footage, call detail records CDRs, forensic drive dumps, photos, audio).
-   - The browser automatically computes client-side cryptographic SHA-256 hashes of all attached exhibits before upload.
-   - Click 'Seal Evidence & Register on Blockchain' and confirm the MetaMask transaction. The case metadata and evidence hashes are immutably anchored onto the Ethereum Sepolia smart contract.
+CRITICAL INSTRUCTION - ANSWER ANY TOPIC FREELY:
+1. You can answer ANY question on ANY subject without restriction — whether it is general conversation ('how are you', 'tell me a joke', 'who are you', 'how's your day'), science, programming, mathematics, physics, biology, history, geography, arts, pop culture, life advice, or everyday general knowledge.
+2. NEVER give canned, scripted, or robotic replies. Do not force every conversation into an Evidex lecture. Converse naturally, fluently, and warmly like a real AI assistant.
+3. If the user asks about the Evidex Decentralized Evidence Protection & Chain of Custody System, Indian Law (Bharatiya Nyaya Sanhita - BNS, Bharatiya Sakshya Adhiniyam - BSA Section 65B, IT Act 2000, Police Station evidence custody), or active registered cases, seamlessly incorporate the live ledger context provided below.
 
-2. HOW TO VERIFY EVIDENCE & DETECT TAMPERING:
-   - Open the 'Verify Custody' tab on the top menu.
-   - Drag-and-drop the evidence file or paste its 64-character SHA-256 hash.
-   - Evidex cross-references the hash against the on-chain Ethereum Sepolia smart contract in real time.
-   - If intact, a green 'Cryptographically Verified' badge and Section 65B Certificate are displayed. If modified by even a single bit, an immediate red 'Tamper Incident Detected' alert is logged.
+EVIDEX SYSTEM ARCHITECTURE & USER WORKFLOWS (FOR EVIDEX QUERIES):
+- Register a Case: Connect Police Officer MetaMask wallet -> Click 'Register Case' -> Fill FIR Number & BNS / IT Act sections -> Attach digital files (CCTV, CDRs, photos) -> Client-side SHA-256 computed -> 'Seal Evidence & Register on Blockchain' immutably writes hashes onto Ethereum Sepolia smart contract.
+- Verify Evidence: 'Verify Custody' tab -> Upload evidence file or paste 64-character SHA-256 hash -> Cross-referenced on Ethereum Sepolia -> Matching returns Section 65B Certificate; mismatch triggers Tamper Incident Alert.
+- Transfer Custody: 'Active Cases' / 'Chain of Custody' -> 'Transfer Custody' -> Select Police, FSL (Forensic Science Lab), or Court -> Sign with recipient wallet on MetaMask.
+- Roles: Admin (onboards officers), Police Officer (registers FIRs & seals exhibits), Forensic Analyst FSL (analyzes disk images), Court/Judiciary (validates immutable audit trail).
 
-3. HOW TO TRANSFER CUSTODY (POLICE -> FSL -> COURT):
-   - Navigate to 'Active Cases' or 'Chain of Custody'.
-   - Select the case and evidence item.
-   - Click 'Transfer Custody', choose destination (e.g. State Forensic Science Laboratory FSL or Sessions Court), and provide the recipient officer's Ethereum wallet address.
-   - Sign the handoff transaction with MetaMask to permanently log the timestamp and digital signature on-chain.
+User Role: ${role || 'Officer'}
 
-4. USER ROLES:
-   - Admin: Approves officer wallet registrations and manages system telemetry.
-   - Police Officer: Registers FIR cases, hashes exhibits, and transfers evidence.
-   - Forensic Analyst (FSL): Conducts write-blocked digital forensic examinations and submits reports.
-   - Court / Judiciary: Inspects smart contract audit trails and admits electronic evidence into trial.
-
-User Role: ${role || 'Law Enforcement Officer'}
-
-LIVE BLOCKCHAIN & CASE CONTEXT FROM EVIDEX LEDGER:
+LIVE BLOCKCHAIN & CASE CONTEXT FROM EVIDEX LEDGER (REFERENCE WHEN ASKED):
 - Registered Cases (${liveCases.length} total):
 ${liveCases.map((c, i) => `  ${i+1}. Case #${c.case_number} | FIR: ${c.fir_number || 'N/A'} | Station: ${c.police_station || 'TN Police'} | Sections: ${c.law_sections || 'BNS'} | Status: ${c.case_status || 'Open'} | Incident: "${c.description || 'Digital evidence investigation'}"`).join('\n') || '  No cases registered yet.'}
 
@@ -668,35 +701,36 @@ ${liveEvidence.map((e, i) => `  ${i+1}. ${e.file_name} (Case: ${e.case_number}, 
 - Recent Custody Trail & Audit Logs:
 ${liveAudit.map((a, i) => `  ${i+1}. [${a.created_at}] Action: ${a.action} (Case: ${a.case_number || 'Global'})`).join('\n') || '  No custody transfers yet.'}
 
-CRITICAL INSTRUCTIONS:
-1. Provide a direct, intelligent, and context-aware answer specifically addressing what the user is asking.
-2. If the user asks how to do something (e.g., register a case, verify evidence, transfer custody), give clear, sequential, numbered steps based on the Evidex workflows above.
-3. Maintain a professional, articulate conversational persona. Address the officer respectfully ('Officer' or 'Sir'). Always use professional English greetings such as 'Greetings, Officer', 'Hello Officer', or 'Good day, Officer'. Never use 'Namaste' or other non-English greetings.
-4. Keep the answer concise and well-structured (~100 to 220 words) with clear bold headings and bullet points.`;
+TONE & STYLE:
+- Articulate, knowledgeable, engaging, and polite.
+- Address the user respectfully ('Officer' or 'Sir') when discussing law enforcement/cases, or speak warmly and naturally during general conversation.
+- Never use 'Namaste'.
+- Structure answers clearly with bold text and bullet points when explaining complex topics.`;
 
-        const candidateModels = ['gemini-flash-lite-latest'];
-        const ver = 'v1beta';
+        const candidateModels = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'llama-3.3-70b-versatile'];
 
         for (const model of candidateModels) {
           try {
-            const url = `https://generativelanguage.googleapis.com/${ver}/models/${model}:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
-            const aiRes = await fetch(url, {
+            const aiRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
               method: 'POST',
               headers: {
-                'Content-Type': 'application/json',
-                'x-goog-api-key': apiKey.trim()
+                'Authorization': `Bearer ${apiKey.trim()}`,
+                'Content-Type': 'application/json'
               },
-              signal: AbortSignal.timeout(6000),
+              signal: AbortSignal.timeout(12000),
               body: JSON.stringify({
-                contents: [
-                  { role: 'user', parts: [{ text: `${systemPrompt}\n\nUser Question: ${prompt.trim()}` }] }
+                model,
+                messages: [
+                  { role: 'system', content: systemPrompt },
+                  { role: 'user', content: prompt.trim() }
                 ],
-                generationConfig: { maxOutputTokens: 1000, temperature: 0.7 }
+                temperature: 0.7,
+                max_tokens: 1200
               })
             });
             const aiData = await aiRes.json();
-            if (aiRes.ok && aiData.candidates && aiData.candidates[0]?.content?.parts[0]?.text) {
-              const rawReply = aiData.candidates[0].content.parts[0].text;
+            if (aiRes.ok && aiData.choices && aiData.choices[0]?.message?.content) {
+              const rawReply = aiData.choices[0].message.content;
               const formattedHtml = rawReply
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                 .replace(/\*(.*?)\*/g, '<em>$1</em>')
@@ -712,11 +746,11 @@ CRITICAL INSTRUCTIONS:
               });
             }
           } catch (mErr) {
-            console.warn(`Model ${model} failed for chat, trying next candidate:`, mErr.message);
+            console.warn(`Groq model ${model} failed for chat, trying next candidate:`, mErr.message);
           }
         }
-      } catch (geminiErr) {
-        console.warn('Gemini chat failed, using local reasoning fallback:', geminiErr);
+      } catch (groqErr) {
+        console.warn('Groq chat failed, using local reasoning fallback:', groqErr);
       }
     }
 
@@ -733,74 +767,14 @@ CRITICAL INSTRUCTIONS:
   }
 });
 
-// ── EVIDEX AI INDIAN ENGLISH VOICE TTS SYNTHESIS ──
+// ── EVIDEX AI VOICE TTS FALLBACK ──
 router.post('/ai/tts', async (req, res) => {
-  try {
-    const { text } = req.body;
-    if (!text || !text.trim()) {
-      return res.status(400).json({ success: false, error: 'Text required' });
-    }
-
-    const cleanText = text.replace(/[*#_`]/g, '').trim().substring(0, 650);
-
-    const apiKey = getGeminiApiKey();
-    if (!apiKey) {
-      return res.json({ success: false, fallback: true, error: 'No Gemini key configured' });
-    }
-
-    const ttsModels = [
-      'gemini-3.8-flash-lite-tts',
-      'gemini-3.8-flash-tts',
-      'gemini-2.5-flash-preview-tts'
-    ];
-
-    const voiceNames = ['Puck', 'Charon', 'Kore'];
-
-    for (const model of ttsModels) {
-      for (const voiceName of voiceNames) {
-        try {
-          const ttsRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            signal: AbortSignal.timeout(10000),
-            body: JSON.stringify({
-              contents: [{
-                parts: [{ text: "Speak the following message aloud with a clear, polite, natural Indian English accent (en-IN). Ensure clear pronunciation, natural pacing, and crisp articulation so every word is easy to understand:\n\n" + cleanText }]
-              }],
-              generationConfig: {
-                responseModalities: ["AUDIO"],
-                speechConfig: {
-                  voiceConfig: {
-                    prebuiltVoiceConfig: {
-                      voiceName
-                    }
-                  }
-                }
-              }
-            })
-          });
-
-          const data = await ttsRes.json();
-          const inlineData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-          if (inlineData && inlineData.data) {
-            const pcmBuf = Buffer.from(inlineData.data, 'base64');
-            const wavBuf = pcmToWav(pcmBuf, 24000, 1, 16);
-            return res.json({
-              success: true,
-              voice: `Evidex AI Indian English (${model} - ${voiceName})`,
-              audioUrl: `data:audio/wav;base64,${wavBuf.toString('base64')}`
-            });
-          }
-        } catch (mErr) {
-          console.warn(`TTS attempt with ${model}/${voiceName} failed:`, mErr.message);
-        }
-      }
-    }
-
-    return res.json({ success: false, fallback: true, error: 'TTS generation unavailable' });
-  } catch (err) {
-    return res.json({ success: false, fallback: true, error: err.message });
-  }
+  // Voice synthesis handled by browser speech synthesis for immediate, natural speech
+  return res.json({
+    success: false,
+    fallback: true,
+    error: 'Speech synthesis handled directly via browser engine'
+  });
 });
 
 module.exports = router;

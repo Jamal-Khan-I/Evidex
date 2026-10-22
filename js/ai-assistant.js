@@ -178,9 +178,9 @@
         <div class="ai-dialogue-body" id="aiChatFeed">
           <div class="ai-msg assistant">
             <div class="ai-msg-bubble">
-              Greetings, Officer. I am your <strong>Evidex Case Intelligence Assistant</strong>. I monitor blockchain case dossiers, tamper audits, forensic lab reports, and custody transfers under Indian evidentiary standards.
+              Greetings, Officer! I am <strong>EVIDEX AI</strong>, powered by Groq ultra-fast neural inference. I have full conversational intelligence—you can ask me anything from case analysis, digital forensics, and Indian law to general knowledge, science, or casual conversation!
               <br><br>
-              Ask me to explain the latest registered case, summarize dossiers, or inspect chain of custody.
+              Try asking <em>"How are you?"</em>, <em>"Explain the latest case"</em>, or whatever questions you have.
             </div>
           </div>
         </div>
@@ -213,7 +213,7 @@
         <!-- Dialogue Input Bar -->
         <div class="ai-dialogue-input-bar">
           <div class="ai-input-wrap">
-            <input type="text" id="aiPromptInput" placeholder="Ask about cases, forensics, evidence..." autocomplete="off" />
+            <input type="text" id="aiPromptInput" placeholder="Ask me anything... cases, law, science, general questions..." autocomplete="off" />
           </div>
           <button type="button" id="aiVoiceBtn" title="Ask using your voice">
             🎙️
@@ -852,13 +852,23 @@
     }, speed);
   }
 
-  // ── SMART CASE KNOWLEDGE ENGINE & REAL-TIME GEMINI AI ──
+  // ── SMART KNOWLEDGE ENGINE & REAL-TIME GROQ CONVERSATIONAL AI ──
   async function generateAIAnswer(query) {
     const q = (query || '').toLowerCase().trim();
     const role = window.currentUserRole || 'Officer';
 
-    // 1. STORYTELLING REQUEST (Last Case Registered)
-    if (q.includes('story') || q.includes('last case') || q.includes('recent case') || q.includes('registered case') || q.includes('explain the case') || q.includes('explain about the last case')) {
+    // 1. EXPLICIT CASE STORYTELLING REQUEST (Narrate the registered case)
+    const isExplicitCaseStory = 
+      q.includes('story of last case') || 
+      q.includes('story of the last case') || 
+      q.includes('story of the case') || 
+      q.includes('case story') || 
+      q.includes('investigative story') || 
+      q.includes('explain about the last case that was registered like a story') ||
+      q.includes('narrate the case dossier') ||
+      q.includes('narrate the last case');
+
+    if (isExplicitCaseStory) {
       try {
         if (window.epsApi && typeof window.epsApi.analyzeCaseStory === 'function') {
           const res = await window.epsApi.analyzeCaseStory();
@@ -875,7 +885,7 @@
       }
     }
 
-    // 2. LIVE DYNAMIC CONVERSATIONAL AI VIA GEMINI (NO SCRIPTED / CANNED REPLIES)
+    // 2. LIVE DYNAMIC CONVERSATIONAL AI VIA GROQ ULTRA-FAST LPU (NO SCRIPTED / CANNED REPLIES)
     try {
       if (window.epsApi && typeof window.epsApi.askEvidexAi === 'function') {
         const chatRes = await window.epsApi.askEvidexAi(query, role);
@@ -888,7 +898,7 @@
         }
       }
     } catch (e) {
-      console.warn('Real-time Gemini chat error:', e);
+      console.warn('Real-time Groq chat error:', e);
     }
 
     // 3. Dynamic Local Fallback if server/network is offline
