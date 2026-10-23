@@ -1,0 +1,52 @@
+IN THE COURT OF THE PRINCIPAL SESSIONS JUDGE
+SPECIAL COURT FOR CYBER CRIMES & ECONOMIC OFFENCES
+PATIALA HOUSE COURTS COMPLEX, NEW DELHI
+
+SESSION CASE NO: SC/CYBER/2026/088
+CONNECTED WITH: FIR No. 001/2026, Central Cyber Police Station, New Delhi
+SYSTEM DOSSIER REFERENCE: CASE-2026-001
+
+STATE (NCT OF DELHI) THROUGH INSPECTOR VIKRAMADITYA RATHORE
+VERSUS
+1. RAJESH VARMA @ ROCKY, S/O SH. MAHENDRA VARMA (MASTER OPERATOR)
+2. SUNIL KUMAR @ SONU, S/O SH. RAMESH KUMAR (MULE ACCOUNT RECRUITER)
+
+JUDGMENT & FINAL DISPOSITION ORDER
+Pronounced in Open Court on 22/02/2026
+
+CORAM:
+HON'BLE JUSTICE K. SRINIVASAN, M.L.,
+Principal Sessions Judge & Special CBI Cyber Court Magistrate
+
+1. ADMISSIBILITY OF ELECTRONIC EVIDENCE UNDER SECTION 63 OF BHARATIYA SAKSHYA ADHINIYAM (BSA), 2023:
+   The prosecution has presented digital exhibits (Exhibit-A through Exhibit-E) secured and registered on the Evidex Ethereum Sepolia Smart Contract Ledger. The defense challenged the chain of custody asserting potential tampering during police custody and laboratory transit.
+
+   FINDINGS OF THE COURT ON ELECTRONIC ADMISSIBILITY:
+   - The Court examined the cryptographic SHA-256 integrity hash verification and the immutable timestamped chain of custody logged directly on the decentralized Ethereum blockchain.
+   - The forensic examination report (CFSL/CYBER/2026/REP-0419) confirmed that the cryptographic hash of each physical disk image and audio bitstream at point of collection precisely matches the hash evaluated during CFSL laboratory examination.
+   - Under Section 63(2) & 63(4) of Bharatiya Sakshya Adhiniyam, 2023 (read with Section 79A of IT Act 2000), the digital evidence exhibits satisfy all statutory requirements of integrity, mathematical immutability, and chain of custody preservation. The exhibits are hereby formally ADMITTED into evidence without exception.
+
+2. VERDICT & PRONOUNCEMENT:
+   Upon meticulous scrutiny of forensic acoustic spectrograms proving voice deepfakes, GSM SIM-Box automated IVR logs, and bank-to-crypto laundering trails, the Court finds the prosecution's charges proven beyond reasonable doubt.
+
+   The Court hereby pronounces:
+   - Accused No. 1 (Rajesh Varma): GUILTY OF CONVICTION under:
+     * Section 318(4) Bharatiya Nyaya Sanhita (BNS), 2023 (Cheating)
+     * Section 336(3) BNS, 2023 (Forgery of Court & Law Enforcement Seals)
+     * Section 66D Information Technology Act, 2000 (Cheating by Personation)
+   - Accused No. 2 (Sunil Kumar): GUILTY OF CONVICTION under:
+     * Section 318(4) read with Section 61(2) BNS, 2023 (Criminal Conspiracy & Mule Layering)
+
+3. SENTENCING & JUDICIAL DIRECTIVES:
+   A. Accused No. 1 is sentenced to 7 (seven) years of Rigorous Imprisonment along with a fine of ₹25,00,000/-.
+   B. Accused No. 2 is sentenced to 4 (four) years of Rigorous Imprisonment along with a fine of ₹10,00,000/-.
+   C. Restitution Order: The seized bank assets and recovered cryptocurrency funds amounting to ₹4,85,00,000/- are ordered to be released and restored directly to the complainant, Dr. Rameshwar Sharma, within 30 days.
+   D. Case Status & Dossier Closure: The Registrar of this Court is directed to record this judgment into the Evidex decentralized ledger and mark Case Dossier CASE-2026-001 as officially CLOSED and immutably archived.
+
+GIVEN UNDER MY HAND AND THE SEAL OF THE COURT THIS 22ND DAY OF FEBRUARY, 2026.
+
+[SEAL OF THE PRINCIPAL SESSIONS COURT]
+
+(JUSTICE K. SRINIVASAN)
+Principal Sessions Judge & Special Cyber Magistrate
+Patiala House Courts, New Delhi

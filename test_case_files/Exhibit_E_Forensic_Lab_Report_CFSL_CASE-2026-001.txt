@@ -1,0 +1,54 @@
+CENTRAL FORENSIC SCIENCE LABORATORY (CFSL)
+DIRECTORATE OF FORENSIC SCIENCE SERVICES, MINISTRY OF HOME AFFAIRS
+GOVERNMENT OF INDIA, CBI COMPLEX, LODHI ROAD, NEW DELHI - 110003
+
+REPORT NO: CFSL/CYBER/2026/REP-0419
+DATED: 18/02/2026
+
+FORENSIC LABORATORY EXAMINATION & SCIENTIFIC ANALYSIS REPORT
+Issued under Section 63 of the Bharatiya Sakshya Adhiniyam (BSA), 2023 & Section 79A IT Act 2000
+
+1. REFERENCE PARTICULARS:
+   - Case Reference Number: CASE-2026-001
+   - Originating FIR: FIR No. 001/2026, Central Cyber Police Station, New Delhi
+   - Investigating Officer: Inspector Vikramaditya Rathore (Badge: DL-CYBER-8841)
+   - Examining Division: Cyber Forensics & Audio-Visual Analysis Division, CFSL New Delhi
+   - Lead Examiner: Dr. S. Ramanathan, Principal Scientific Officer (Cyber Forensics)
+
+2. DETAILS OF EVIDENCE EXHIBITS RECEIVED & VERIFIED:
+   - Exhibit-A: 128-Port GSM SIM Box Gateway running cloned eSIM firmware
+     SHA-256 Ledger Hash: 4a2d8e9c1f6b3a5d7e8f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d
+     Custody Check: Blockchain verified, seal intact on arrival.
+   - Exhibit-B: Bank Account & Binance TRC-20 Crypto Transaction Trail Ledger
+     SHA-256 Ledger Hash: 7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d4a2d8e9c1f6b3a5d7e8f0a1b2c3d4e5f6a
+     Custody Check: Blockchain verified, electronic ledger hash matches block state.
+   - Exhibit-C: VoIP Deepfake Audio Capture & Acoustic Spectrogram Profile
+     SHA-256 Ledger Hash: 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
+     Custody Check: Blockchain verified, bitstream preserved.
+   - Exhibit-D: E01 Forensic Disk Image of Command-and-Control Server (IP: 185.220.101.45)
+     SHA-256 Ledger Hash: 9f8e7d6c5b4a3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b
+     Custody Check: Verified write-blocker image matches on-chain hash.
+
+3. SCIENTIFIC EXAMINATION & LABORATORY FINDINGS:
+   A. Acoustic & Voice Biometric Analysis (Exhibit-C):
+      - Spectrogram analysis reveals synthetic harmonic distortion in the 4 kHz - 8 kHz frequency range.
+      - Latency pattern analysis indicates real-time voice conversion leveraging an RVC v2 (Retrieval-based Voice Conversion) neural network architecture.
+      - Training checkpoint recovered from Exhibit-D contained acoustic samples scraped from publicly broadcast press briefings of CBI and Delhi Police officials.
+      - Conclusion: 99.8% probability of algorithmic neural deepfake voice generation used to impersonate Law Enforcement Officers.
+
+   B. SIM Box Hardware & Firmware Extraction (Exhibit-A):
+      - Firmware reverse engineering revealed a custom embedded Linux distribution configured to rotate IMSI/IMEI identifiers dynamically every 180 seconds.
+      - Extracted SQLite database contained dispatch logs for 1,420 automated IVR calls mimicking Department of Telecommunications (DoT) disconnect warnings.
+
+   C. Financial & Cryptocurrency Laundering Trail (Exhibit-B):
+      - The victim's funds (₹4,85,00,000/-) were routed through 4 distinct Layer-1 mule accounts in Axis Bank and ICICI Bank.
+      - Within 42 minutes of credit, funds were swapped via peer-to-peer OTC desks into 584,330 USDT on the TRON blockchain (TRC-20).
+      - Address clustering analysis links the recipient wallet (TJ9v...x7Q) to an organized syndicate operation based in Southeast Asia.
+
+4. CERTIFICATE OF INTEGRITY (SECTION 63 BHARATIYA SAKSHYA ADHINIYAM, 2023):
+   I hereby certify that the electronic extraction, cryptographic verification, and analysis were performed in accordance with ISO/IEC 27037 standards using forensically validated hardware and certified software write-blockers. The SHA-256 hashes generated during examination match the immutable tamper-proof on-chain record in Evidex Smart Contract Ledger without any discrepancy or alteration.
+
+Dr. S. Ramanathan, Ph.D.
+Principal Scientific Officer (Cyber Forensics)
+Central Forensic Science Laboratory, New Delhi
+Official Seal: [CFSL-GOI-CYBER-DELHI]

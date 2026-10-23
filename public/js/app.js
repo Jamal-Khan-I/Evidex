@@ -1260,7 +1260,7 @@ function renderRoleSidebar(role) {
     menuItems = [
       {
         id: "nav-fsl-submit",
-        label: "Submit Report",
+        label: "Submit Forensic Report",
         panelId: "panel-forensics-submit",
         title: "Submit Forensic Report",
         eyebrow: "Forensic Sciences Department · Laboratory Findings",
@@ -1300,13 +1300,13 @@ function renderRoleSidebar(role) {
       }
     ];
   } else if (role === "COURT") {
-    // Exact user requirement: 1. Generate Court Report, 2. Pending Cases, 3. All Cases, 4. Custody Trial
+    // Exact user requirement: 1. Submit Court Report, 2. Pending Cases, 3. All Cases, 4. Custody Trial
     menuItems = [
       {
         id: "nav-court-generate",
-        label: "Generate Court Report",
+        label: "Submit Court Report",
         panelId: "panel-court-generate",
-        title: "Generate Court Report",
+        title: "Submit Court Report",
         eyebrow: "Judicial Bench · Official Orders & Verdicts",
         icon: `<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`
       },
@@ -1963,7 +1963,7 @@ async function submitForensicReportAction(btn) {
 }
 
 function prefillForensicReport(caseNumber) {
-  switchWorkspacePanel('panel-forensics-submit', 'Submit Report', 'State Forensic Science Laboratory');
+  switchWorkspacePanel('panel-forensics-submit', 'Submit Forensic Report', 'State Forensic Science Laboratory');
   const input = document.getElementById("forensicCaseNumber");
   if (input) input.value = caseNumber;
 }
@@ -2041,7 +2041,7 @@ function handleVerdictChange(verdict) {
 }
 
 function prefillCourtReport(caseNumber) {
-  switchWorkspacePanel('panel-court-generate', 'Generate Court Report', 'Judicial Court of Law');
+  switchWorkspacePanel('panel-court-generate', 'Submit Court Report', 'Judicial Court of Law');
   const input = document.getElementById("courtCaseNumber");
   if (input) input.value = caseNumber;
 }
