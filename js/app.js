@@ -186,6 +186,121 @@ async function refreshRoleOptions() {
 
 let provider, signer, contract;
 
+// HTML escaper for clean UI rendering
+function escapeHtml(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+// Clean filename extraction: extracts clean display name and discards long description paragraphs
+function extractCleanFileName(rec, rawDesc) {
+  if (rec?.file_name && typeof rec.file_name === "string" && rec.file_name.trim() && rec.file_name !== rec.id) {
+    return rec.file_name.trim();
+  }
+  if (rec?.fileName && typeof rec.fileName === "string" && rec.fileName.trim() && rec.fileName !== rec.id) {
+    return rec.fileName.trim();
+  }
+  if (rawDesc && typeof rawDesc === "string") {
+    const endMatch = rawDesc.match(/\(([^()]+)\)$/);
+    if (endMatch && endMatch[1] && endMatch[1].trim()) {
+      return endMatch[1].trim();
+    }
+    const evMatch = rawDesc.match(/Evidence\s*\(([^()]+)\)/i);
+    if (evMatch && evMatch[1] && evMatch[1].trim()) {
+      return evMatch[1].trim();
+    }
+    if (rawDesc.length < 50 && !rawDesc.includes("\n") && !rawDesc.toLowerCase().includes("seizure of")) {
+      return rawDesc.trim();
+    }
+  }
+  return `${rec?.id || rec?.evidenceId || "Evidence"}_File.dat`;
+}
+
+// Retrieves only the currently active registered evidence items for a case
+// (ensuring re-registered cases only show their new files, replacing old previous registrations)
+async function getActiveCaseEvidenceItems(caseNumber) {
+  let activeRecords = null;
+  try {
+    if (window.epsApi && typeof window.epsApi.getCaseDetails === "function") {
+      const details = await window.epsApi.getCaseDetails(caseNumber);
+      if (details && Array.isArray(details.evidence) && details.evidence.length > 0) {
+        activeRecords = details.evidence;
+      }
+    }
+  } catch (apiErr) {
+    console.warn("Could not fetch active case evidence from backend:", apiErr);
+  }
+
+  // If backend database has the case's active registered files, use them as source of truth
+  if (activeRecords && activeRecords.length > 0) {
+    const items = [];
+    for (const rec of activeRecords) {
+      let status = 0;
+      let holder = rec.current_custodian || rec.submitter_address || "";
+      let ipfsCid = rec.ipfs_cid || "";
+      let fileHash = rec.file_hash || "";
+      let description = rec.description || "";
+
+      try {
+        if (contract && typeof contract.getEvidence === "function") {
+          const ev = await contract.getEvidence(rec.id);
+          status = ev.status;
+          holder = ev.registeredBy || holder;
+          if (ev.ipfsCid) ipfsCid = ev.ipfsCid;
+          if (ev.fileHash) fileHash = ev.fileHash;
+          if (ev.description) description = ev.description;
+        }
+      } catch (e) {}
+
+      const cleanFileName = extractCleanFileName(rec, description);
+      items.push({
+        evidenceId: rec.id,
+        fileName: cleanFileName,
+        fileHash,
+        fileSize: rec.file_size,
+        ipfsCid,
+        status,
+        holder,
+        description
+      });
+    }
+    return items;
+  }
+
+  // Fallback: If no database records found, read on-chain IDs
+  const items = [];
+  if (contract && typeof contract.getEvidenceIdsByCase === "function") {
+    const onChainIds = await contract.getEvidenceIdsByCase(caseNumber);
+    for (const id of onChainIds) {
+      try {
+        const [cNum, firNumber, policeStation, lawSections, description, fileHash, ipfsCid, registeredBy, registeredAt, status] = await contract.getEvidence(id);
+        const cleanFileName = extractCleanFileName({ id }, description);
+        items.push({
+          evidenceId: id,
+          fileName: cleanFileName,
+          caseNumber: cNum,
+          firNumber,
+          policeStation,
+          lawSections,
+          description,
+          fileHash,
+          ipfsCid,
+          registeredBy,
+          registeredAt,
+          status,
+          holder: registeredBy
+        });
+      } catch (e) {}
+    }
+  }
+  return items;
+}
+
 // ---------- Bulk download: all evidence for a case ----------
 let caseBundleItems = []; // [{ evidenceId, description, fileHash, ipfsCid }]
 
@@ -223,15 +338,7 @@ async function findCaseEvidence(btn) {
   setBtnBusy(btn, true, "Searching...");
 
   try {
-    const caseIds = await contract.getEvidenceIdsByCase(caseNumber);
-    const matches = [];
-    for (const id of caseIds) {
-      try {
-        const [cNum, firNumber, policeStation, lawSections, description, fileHash, ipfsCid, registeredBy, registeredAt, status] = await contract.getEvidence(id);
-        matches.push({ evidenceId: id, caseNumber: cNum, firNumber, policeStation, lawSections, description, fileHash, ipfsCid, registeredBy, registeredAt, status });
-      } catch (e) { /* skip a record that fails to load rather than aborting the whole search */ }
-    }
-
+    const matches = await getActiveCaseEvidenceItems(caseNumber);
     caseBundleItems = matches;
 
     if (matches.length === 0) {
@@ -243,14 +350,26 @@ async function findCaseEvidence(btn) {
     }
 
     listDiv.innerHTML = matches.map((m, i) => `
-      <div class="case-row">
-        <div class="case-row-info">
-          <span class="case-row-id">${m.evidenceId}</span>
-          <span class="case-row-desc"> — ${m.description || "no description"}</span>
-          ${!m.ipfsCid ? '<span class="case-row-flag"> (hash-only, no file on IPFS)</span>' : ''}
+      <div class="evidence-select-card" style="cursor:default;">
+        <div class="evidence-select-left">
+          <div class="evidence-select-icon" style="background:#f8fafc; color:#475569; border-color:#e2e8f0;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+            </svg>
+          </div>
+          <div class="evidence-select-details">
+            <div class="evidence-select-header">
+              <span class="evidence-select-id">${escapeHtml(m.evidenceId)}</span>
+              ${m.ipfsCid ? '<span class="evidence-select-badge">IPFS Anchored</span>' : '<span class="evidence-select-badge" style="background:#fffbeb; color:#d97706; border-color:#fef3c7;">Hash-Only</span>'}
+            </div>
+            <div class="evidence-select-filename" title="${escapeHtml(m.fileName)}">
+              ${escapeHtml(m.fileName)}
+            </div>
+          </div>
         </div>
         ${m.ipfsCid ? `
-          <button type="button" class="download-icon-btn case-bundle-download-btn" data-idx="${i}" title="Download ${m.evidenceId} file" aria-label="Download evidence file">
+          <button type="button" class="download-icon-btn case-bundle-download-btn" data-idx="${i}" title="Download ${escapeHtml(m.fileName)}" aria-label="Download evidence file">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="7 10 12 15 17 10"></polyline>
@@ -265,7 +384,7 @@ async function findCaseEvidence(btn) {
       rowBtn.addEventListener("click", () => downloadSingleCaseItem(parseInt(rowBtn.dataset.idx, 10), rowBtn));
     });
 
-    downloadBtn.style.display = "";
+    downloadBtn.style.display = matches.some(m => m.ipfsCid) ? "" : "none";
     document.getElementById("courtReportBtn").style.display = "";
     document.getElementById("courtReportHint").style.display = "";
   } catch (err) {
@@ -417,14 +536,7 @@ async function findCaseEvidenceForTransfer(btn) {
   listDiv.innerHTML = `<div style="color:var(--ink-500); font-size:13px;">Searching all registered evidence...</div>`;
   setBtnBusy(btn, true, "Searching...");
   try {
-    const caseIds = await contract.getEvidenceIdsByCase(caseNumber);
-    const matches = [];
-    for (const id of caseIds) {
-      try {
-        const [, , , , description, , , , , status] = await contract.getEvidence(id);
-        matches.push({ evidenceId: id, description, status });
-      } catch (e) { /* skip a record that fails to load */ }
-    }
+    const matches = await getActiveCaseEvidenceItems(caseNumber);
 
     if (matches.length === 0) {
       listDiv.innerHTML = `<div style="color:var(--ink-500); font-size:13px;">No evidence found for case "${caseNumber}".</div>`;
@@ -432,13 +544,31 @@ async function findCaseEvidenceForTransfer(btn) {
     }
 
     listDiv.innerHTML = matches.map((m, i) => `
-      <label class="case-row" style="cursor:pointer;">
-        <span class="case-row-info">
-          <input type="checkbox" class="bulk-transfer-check" data-idx="${i}" ${m.status === 0 ? "checked" : "disabled"} style="margin-right:8px;" />
-          <span class="case-row-id">${m.evidenceId}</span>
-          <span class="case-row-desc"> — ${m.description || "no description"}</span>
-          ${m.status !== 0 ? '<span class="case-row-flag"> (case closed — not transferable)</span>' : ''}
-        </span>
+      <label class="evidence-select-card" for="bulk-transfer-${i}">
+        <div class="evidence-select-left">
+          <div class="evidence-select-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+            </svg>
+          </div>
+          <div class="evidence-select-details">
+            <div class="evidence-select-header">
+              <span class="evidence-select-id">${escapeHtml(m.evidenceId)}</span>
+              ${m.status === 0 
+                ? '<span class="evidence-select-badge">Active</span>' 
+                : '<span class="evidence-select-badge closed">Closed</span>'}
+            </div>
+            <div class="evidence-select-filename" title="${escapeHtml(m.fileName)}">
+              ${escapeHtml(m.fileName)}
+            </div>
+          </div>
+        </div>
+        <div class="evidence-select-right">
+          <input type="checkbox" id="bulk-transfer-${i}" class="evidence-select-checkbox bulk-transfer-check" data-idx="${i}" ${m.status === 0 ? "checked" : "disabled"} />
+        </div>
       </label>
     `).join("");
 
@@ -3770,7 +3900,7 @@ async function lookupHolder(btn) {
   setBtnBusy(btn, true, "Searching...");
   showResult("holderResult", "pending", "Searching all registered evidence...");
   try {
-    const matches = await contract.getEvidenceIdsByCase(caseNumber);
+    const matches = await getActiveCaseEvidenceItems(caseNumber);
 
     if (matches.length === 0) {
       showResult("holderResult", "fail", `No evidence found for case "${caseNumber}".`);
@@ -3778,12 +3908,45 @@ async function lookupHolder(btn) {
     }
 
     const rows = [];
-    for (const id of matches) {
-      const holder = await contract.getCurrentHolder(id);
-      const role = await contract.getRole(holder);
-      rows.push(`${id} — ${holder} (${await resolveRoleName(role)})`);
+    for (const item of matches) {
+      const id = item.evidenceId;
+      let holder = item.holder || "";
+      let roleName = "Unknown Role";
+      try {
+        if (contract && typeof contract.getCurrentHolder === "function") {
+          holder = await contract.getCurrentHolder(id);
+          const role = await contract.getRole(holder);
+          roleName = await resolveRoleName(role);
+        }
+      } catch (e) {}
+
+      rows.push(`
+        <div class="evidence-select-card" style="cursor:default; margin-bottom:10px;">
+          <div class="evidence-select-left">
+            <div class="evidence-select-icon" style="background:#f1f5f9; color:#475569; border-color:#e2e8f0;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="8.5" cy="7.5" r="4"></circle>
+                <polyline points="17 11 19 13 23 9"></polyline>
+              </svg>
+            </div>
+            <div class="evidence-select-details">
+              <div class="evidence-select-header">
+                <span class="evidence-select-id">${escapeHtml(id)}</span>
+                <span class="evidence-select-badge">${escapeHtml(roleName)}</span>
+              </div>
+              <div class="evidence-select-filename" title="${escapeHtml(item.fileName)}">
+                ${escapeHtml(item.fileName)}
+              </div>
+              <div style="font-family:var(--font-mono); font-size:11.5px; color:#64748b; margin-top:4px;">
+                Current Custodian: <span style="color:#0f172a; font-weight:600;">${escapeHtml(holder)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      `);
     }
-    showResult("holderResult", "ok", rows.join("<br>"));
+    showResult("holderResult", "ok", rows.join(""));
   } catch (err) {
     showResult("holderResult", "fail", formatError(err));
   } finally {
@@ -3792,7 +3955,7 @@ async function lookupHolder(btn) {
 }
 
 // ---------- Stage 3: Verify (all by case number) ----------
-let bulkVerifyItems = []; // [{ evidenceId, description }]
+let bulkVerifyItems = []; // [{ evidenceId, fileName }]
 
 async function findCaseEvidenceForVerify(btn) {
   const caseNumber = document.getElementById("bulkVerifyCaseNumber").value.trim();
@@ -3811,14 +3974,7 @@ async function findCaseEvidenceForVerify(btn) {
   listDiv.innerHTML = `<div style="color:var(--ink-500); font-size:13px;">Searching all registered evidence...</div>`;
   setBtnBusy(btn, true, "Searching...");
   try {
-    const caseIds = await contract.getEvidenceIdsByCase(caseNumber);
-    const matches = [];
-    for (const id of caseIds) {
-      try {
-        const [, , , , description] = await contract.getEvidence(id);
-        matches.push({ evidenceId: id, description });
-      } catch (e) { /* skip a record that fails to load */ }
-    }
+    const matches = await getActiveCaseEvidenceItems(caseNumber);
 
     if (matches.length === 0) {
       listDiv.innerHTML = `<div style="color:var(--ink-500); font-size:13px;">No evidence found for case "${caseNumber}".</div>`;
@@ -3826,12 +3982,21 @@ async function findCaseEvidenceForVerify(btn) {
     }
 
     listDiv.innerHTML = matches.map((m, i) => `
-      <div class="case-row" style="flex-direction:column; align-items:flex-start; gap:6px;">
-        <div class="case-row-info">
-          <span class="case-row-id">${m.evidenceId}</span>
-          <span class="case-row-desc"> — ${m.description || "no description"}</span>
+      <div class="evidence-verify-card">
+        <div class="evidence-verify-header">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="evidence-select-id">${escapeHtml(m.evidenceId)}</span>
+            ${m.status === 0 
+              ? '<span class="evidence-select-badge">Active</span>' 
+              : '<span class="evidence-select-badge closed">Closed</span>'}
+          </div>
+          <div class="evidence-select-filename" style="margin-top:0; font-weight:600; font-size:13px;" title="${escapeHtml(m.fileName)}">
+            ${escapeHtml(m.fileName)}
+          </div>
         </div>
-        <input type="file" class="bulk-verify-file" data-idx="${i}" style="width:100%;" />
+        <div class="evidence-verify-input-wrap" style="margin-top:10px;">
+          <input type="file" class="bulk-verify-file" data-idx="${i}" aria-label="Select file to verify ${escapeHtml(m.fileName)}" />
+        </div>
       </div>
     `).join("");
 
@@ -3947,20 +4112,31 @@ async function findCaseEvidenceForTrail(btn) {
   listDiv.innerHTML = `<div style="color:var(--ink-500); font-size:13px;">Searching all registered evidence...</div>`;
   setBtnBusy(btn, true, "Searching...");
   try {
-    const caseIds = await contract.getEvidenceIdsByCase(caseNumber);
+    const activeMatches = await getActiveCaseEvidenceItems(caseNumber);
 
     const items = [];
-    for (const id of caseIds) {
+    for (const match of activeMatches) {
+      const id = match.evidenceId;
       try {
         const [cNum, firNumber, policeStation, lawSections, description, fileHash, ipfsCid, registeredBy, registeredAt, status] =
           await contract.getEvidence(id);
         const [holders, holderRoles, timestamps, notes] = await contract.getCustodyTrail(id);
         items.push({
-          evidenceId: id, caseNumber: cNum, firNumber, policeStation, lawSections, description,
+          evidenceId: id,
+          fileName: match.fileName,
+          caseNumber: cNum, firNumber, policeStation, lawSections, description,
           registeredBy, registeredAt, isOpen: status === 0,
           holders, holderRoles, timestamps, notes,
         });
-      } catch (e) { /* skip a record that fails to load rather than aborting the whole search */ }
+      } catch (e) {
+        items.push({
+          evidenceId: id,
+          fileName: match.fileName,
+          caseNumber, firNumber: '—', policeStation: '—', lawSections: '—', description: match.description,
+          registeredBy: match.holder, registeredAt: 0, isOpen: match.status === 0,
+          holders: [match.holder], holderRoles: [0], timestamps: [0], notes: ['Registered'],
+        });
+      }
     }
 
     if (items.length === 0) {
@@ -3968,24 +4144,27 @@ async function findCaseEvidenceForTrail(btn) {
       return;
     }
 
-    listDiv.innerHTML = `<div style="color:var(--ink-500); font-size:13px;">${items.length} evidence item(s) found under ${caseNumber}.</div>`;
+    listDiv.innerHTML = `<div style="color:var(--ink-500); font-size:13px;">${items.length} active evidence item(s) found under ${caseNumber}.</div>`;
     currentTrailCaseItems = items;
 
     const anyOpen = items.some(it => it.isOpen);
     const first = items[0];
-    const legalRow = `<div style="font-family:var(--mono); font-size:10.5px; color:var(--ink-500); margin-top:6px;">FIR: ${first.firNumber || "—"} &nbsp;|&nbsp; PS: ${first.policeStation || "—"}<br>Sections: ${first.lawSections || "—"}</div>`;
+    const legalRow = `<div style="font-family:var(--font-mono); font-size:11.5px; color:#64748b; margin-top:6px;">FIR: ${first.firNumber || "—"} &nbsp;|&nbsp; PS: ${first.policeStation || "—"}<br>Sections: ${first.lawSections || "—"}</div>`;
     const itemRows = items.map(it => `
-      <div style="font-size:12.5px; color:var(--ink-300); padding:6px 0; border-top:1px solid var(--navy-800);">
-        <strong>${it.evidenceId}</strong> — ${it.description || "no description"}
-        <span style="font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:0.5px; color:${it.isOpen ? '#7FD4AB' : '#F0A29D'};"> (${it.isOpen ? 'open' : 'closed'})</span>
+      <div style="font-size:12.5px; color:#334155; padding:8px 0; border-top:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <strong style="font-family:var(--font-mono); color:#0f172a;">${escapeHtml(it.evidenceId)}</strong>
+          <span style="color:#475569; margin-left:6px; font-weight:500;">— ${escapeHtml(it.fileName || extractCleanFileName(it, it.description))}</span>
+        </div>
+        <span style="font-family:var(--font-mono); font-size:10.5px; text-transform:uppercase; letter-spacing:0.5px; font-weight:600; padding:2px 8px; border-radius:4px; ${it.isOpen ? 'background:#dcfce7; color:#166534;' : 'background:#fee2e2; color:#991b1b;'}">${it.isOpen ? 'open' : 'closed'}</span>
       </div>
     `).join("");
 
     detailsDiv.innerHTML = `
-      <div style="border:1px solid var(--glass-border); border-radius:var(--radius); padding:14px; background:var(--glass-bg);">
+      <div style="border:1px solid #e2e8f0; border-radius:12px; padding:16px; background:#ffffff; box-shadow:0 1px 3px rgba(15,23,42,0.03);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <span style="color:var(--ink-100); font-weight:600; font-size:13.5px;">Case ${caseNumber}</span>
-          <span style="font-family:var(--mono); font-size:10.5px; padding:3px 10px; border-radius:100px; text-transform:uppercase; letter-spacing:0.6px; ${anyOpen ? 'background:rgba(55,158,111,0.15); color:#7FD4AB;' : 'background:rgba(193,69,61,0.15); color:#F0A29D;'}">${anyOpen ? 'Open' : 'Closed'}</span>
+          <span style="color:#0f172a; font-weight:700; font-size:14px;">Case ${caseNumber}</span>
+          <span style="font-family:var(--font-mono); font-size:11px; padding:3px 10px; border-radius:100px; text-transform:uppercase; letter-spacing:0.5px; font-weight:600; ${anyOpen ? 'background:#dcfce7; color:#166534;' : 'background:#fee2e2; color:#991b1b;'}">${anyOpen ? 'Open' : 'Closed'}</span>
         </div>
         ${legalRow}
         ${itemRows}
@@ -4210,13 +4389,13 @@ async function loadLabCaseEvidence() {
   select.disabled = true;
   select.innerHTML = `<option value="">Loading...</option>`;
   try {
-    const evidenceIds = await contract.getEvidenceIdsByCase(caseNumber);
-    if (evidenceIds.length === 0) {
+    const items = await getActiveCaseEvidenceItems(caseNumber);
+    if (items.length === 0) {
       select.innerHTML = `<option value="">No evidence found for this case</option>`;
       showResult("labReportSubmitResult", "fail", `No evidence found under case "${caseNumber}".`);
       return;
     }
-    select.innerHTML = evidenceIds.map(id => `<option value="${id}">${id}</option>`).join("");
+    select.innerHTML = items.map(it => `<option value="${escapeHtml(it.evidenceId)}">${escapeHtml(it.evidenceId)} — ${escapeHtml(it.fileName)}</option>`).join("");
     select.disabled = false;
     document.getElementById("labReportSubmitResult").innerHTML = "";
 
@@ -4341,11 +4520,11 @@ async function viewLabReports() {
     for (let i = 0; i < findingsList.length; i++) {
       const label = await getOfficerLabel(submittedBys[i]);
       const date = new Date(timestamps[i].toNumber() * 1000).toLocaleString();
-      html += `<div style="border:1px solid var(--navy-700); border-radius:10px; padding:12px 14px; margin-bottom:10px;">
-        <div style="font-size:11.5px; color:var(--ink-500); margin-bottom:6px;">${date} — ${label}${label !== submittedBys[i] ? ` (${submittedBys[i]})` : ""}</div>
-        <div style="font-size:13px;">${findingsList[i]}</div>
-        ${reportHashes[i] ? `<div style="font-family:var(--mono); font-size:11px; color:var(--ink-500); margin-top:6px;">File Hash: ${reportHashes[i]}</div>` : ""}
-        ${reportIpfsCids[i] ? `<div style="font-family:var(--mono); font-size:11px; color:var(--ink-500);">IPFS CID: ${reportIpfsCids[i]}</div>` : ""}
+      html += `<div style="border:1px solid #e2e8f0; border-radius:10px; padding:14px; margin-bottom:10px; background:#ffffff; box-shadow:0 1px 3px rgba(15,23,42,0.03);">
+        <div style="font-size:12px; color:#64748b; margin-bottom:6px; font-weight:500;">${date} — <span style="color:#0f172a; font-weight:600;">${label}</span>${label !== submittedBys[i] ? ` <span style="font-family:var(--font-mono); font-size:11px;">(${submittedBys[i].slice(0,6)}...${submittedBys[i].slice(-4)})</span>` : ""}</div>
+        <div style="font-size:13px; color:#334155; line-height:1.5;">${escapeHtml(findingsList[i])}</div>
+        ${reportHashes[i] ? `<div style="font-family:var(--font-mono); font-size:11px; color:#64748b; margin-top:8px; word-break:break-all;">File Hash: <span style="color:#0f172a;">${reportHashes[i]}</span></div>` : ""}
+        ${reportIpfsCids[i] ? `<div style="font-family:var(--font-mono); font-size:11px; color:#2563eb; margin-top:3px;">IPFS CID: <a href="https://gateway.pinata.cloud/ipfs/${reportIpfsCids[i]}" target="_blank" style="color:#2563eb; text-decoration:underline;">${reportIpfsCids[i]}</a></div>` : ""}
       </div>`;
     }
     listEl.innerHTML = html;

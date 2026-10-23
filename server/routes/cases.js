@@ -136,6 +136,11 @@ router.post('/', (req, res, next) => {
     const isForensicsReq = forensicsRequested ? 1 : 0;
     const forensicsStatus = isForensicsReq ? 'PENDING' : 'NOT_REQUIRED';
 
+    // Clean out previous records for this case so newly registered evidence cleanly replaces previous ones
+    db.run('DELETE FROM evidence_records WHERE case_number = ?', [caseNumber]);
+    db.run('DELETE FROM forensic_reports WHERE case_number = ?', [caseNumber]);
+    db.run('DELETE FROM court_reports WHERE case_number = ?', [caseNumber]);
+
     db.run(
       `INSERT INTO cases 
        (case_number, fir_number, police_station, law_sections, description, registered_by, officer_name, case_key, forensics_requested, forensics_status, court_status, case_status, created_at)
@@ -362,6 +367,20 @@ router.get('/:caseNumber/bundle', (req, res, next) => {
         courtReports
       }
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// DELETE /api/cases/:caseNumber - Delete a case and its indexed evidence records
+router.delete('/:caseNumber', (req, res, next) => {
+  try {
+    const { caseNumber } = req.params;
+    db.run('DELETE FROM evidence_records WHERE case_number = ?', [caseNumber]);
+    db.run('DELETE FROM forensic_reports WHERE case_number = ?', [caseNumber]);
+    db.run('DELETE FROM court_reports WHERE case_number = ?', [caseNumber]);
+    db.run('DELETE FROM cases WHERE case_number = ?', [caseNumber]);
+    res.json({ success: true, message: `Case ${caseNumber} and all associated records deleted.` });
   } catch (err) {
     next(err);
   }
