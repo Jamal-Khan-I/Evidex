@@ -187,8 +187,8 @@
 
         <!-- Quick Action Chips -->
         <div class="ai-suggestions-bar" id="aiSuggestionsBar">
-          <button type="button" class="ai-chip primary-chip" data-query="Explain about the last case that was registered like a story">
-            📖 Story of Last Case
+          <button type="button" class="ai-chip primary-chip" data-query="Explain the detailed summary and forensic dossier of the last case that was registered">
+            📋 Details of Last Case
           </button>
           <button type="button" class="ai-chip" data-query="Summarize all registered cases">
             📁 All Cases Summary
@@ -857,8 +857,16 @@
     const q = (query || '').toLowerCase().trim();
     const role = window.currentUserRole || 'Officer';
 
-    // 1. EXPLICIT CASE STORYTELLING REQUEST (Narrate the registered case)
+    // 1. EXPLICIT CASE BRIEFING / DOSSIER REQUEST (Details of the registered case)
     const isExplicitCaseStory = 
+      q.includes('details of last case') || 
+      q.includes('details of the last case') || 
+      q.includes('explain the detailed summary') ||
+      q.includes('explain about the last case') ||
+      q.includes('explain the last case') ||
+      q.includes('dossier of last case') ||
+      q.includes('dossier of the last case') ||
+      q.includes('details of case') ||
       q.includes('story of last case') || 
       q.includes('story of the last case') || 
       q.includes('story of the case') || 

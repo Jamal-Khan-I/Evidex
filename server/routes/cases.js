@@ -141,10 +141,12 @@ router.post('/', (req, res, next) => {
     db.run('DELETE FROM forensic_reports WHERE case_number = ?', [caseNumber]);
     db.run('DELETE FROM court_reports WHERE case_number = ?', [caseNumber]);
 
+    const nowIso = new Date().toISOString();
+
     db.run(
       `INSERT INTO cases 
        (case_number, fir_number, police_station, law_sections, description, registered_by, officer_name, case_key, forensics_requested, forensics_status, court_status, case_status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 'OPEN', DATETIME('now'))
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 'OPEN', ?)
        ON CONFLICT(case_number) DO UPDATE SET
          fir_number = COALESCE(excluded.fir_number, cases.fir_number),
          police_station = COALESCE(excluded.police_station, cases.police_station),
@@ -168,7 +170,8 @@ router.post('/', (req, res, next) => {
         officerName || null,
         caseKey || null,
         isForensicsReq,
-        forensicsStatus
+        forensicsStatus,
+        nowIso
       ]
     );
 
@@ -215,18 +218,20 @@ router.post('/:caseNumber/forensic-report', (req, res, next) => {
       return res.status(400).json({ success: false, error: 'reportTitle is required' });
     }
 
+    const nowIso = new Date().toISOString();
+
     // Ensure case exists
     db.run(
       `INSERT OR IGNORE INTO cases (case_number, forensics_requested, forensics_status, case_status, created_at)
-       VALUES (?, 1, 'PENDING', 'OPEN', DATETIME('now'))`,
-      [caseNumber]
+       VALUES (?, 1, 'PENDING', 'OPEN', ?)`,
+      [caseNumber, nowIso]
     );
 
     // Insert forensic report
     const reportRes = db.run(
       `INSERT INTO forensic_reports 
        (case_number, report_title, lab_name, examiner_name, findings, file_name, file_hash, file_size, ipfs_cid, submitter_address, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME('now'))`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         caseNumber,
         reportTitle,
@@ -237,7 +242,8 @@ router.post('/:caseNumber/forensic-report', (req, res, next) => {
         fileHash || null,
         fileSize || null,
         ipfsCid || null,
-        submitterAddress ? submitterAddress.toLowerCase() : null
+        submitterAddress ? submitterAddress.toLowerCase() : null,
+        nowIso
       ]
     );
 
@@ -287,18 +293,20 @@ router.post('/:caseNumber/court-report', (req, res, next) => {
       closeCase
     } = req.body;
 
+    const nowIso = new Date().toISOString();
+
     // Ensure case exists
     db.run(
       `INSERT OR IGNORE INTO cases (case_number, case_status, created_at)
-       VALUES (?, 'OPEN', DATETIME('now'))`,
-      [caseNumber]
+       VALUES (?, 'OPEN', ?)`,
+      [caseNumber, nowIso]
     );
 
     // Insert court report
     const courtRes = db.run(
       `INSERT INTO court_reports 
        (case_number, court_name, judge_name, verdict, orders_summary, file_name, file_hash, file_size, ipfs_cid, submitter_address, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME('now'))`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         caseNumber,
         courtName || 'Judicial Magistrate Court',
@@ -309,15 +317,16 @@ router.post('/:caseNumber/court-report', (req, res, next) => {
         fileHash || null,
         fileSize || null,
         ipfsCid || null,
-        submitterAddress ? submitterAddress.toLowerCase() : null
+        submitterAddress ? submitterAddress.toLowerCase() : null,
+        nowIso
       ]
     );
 
     const isClosed = closeCase || ['CONVICTION', 'ACQUITTAL', 'CLOSED', 'CASE_DISMISSED'].includes(verdict);
     if (isClosed) {
       db.run(
-        "UPDATE cases SET court_status = 'CLOSED', case_status = 'CLOSED', closed_at = DATETIME('now') WHERE case_number = ?",
-        [caseNumber]
+        "UPDATE cases SET court_status = 'CLOSED', case_status = 'CLOSED', closed_at = ? WHERE case_number = ?",
+        [nowIso, caseNumber]
       );
     } else {
       db.run(

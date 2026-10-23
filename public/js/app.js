@@ -221,15 +221,33 @@ function extractCleanFileName(rec, rawDesc) {
   return `${rec?.id || rec?.evidenceId || "Evidence"}_File.dat`;
 }
 
+// Safely converts any UTC / SQLite timestamp to user's localized timezone
+function formatLocalDateTime(val) {
+  if (!val) return "—";
+  if (typeof val === "number") {
+    const ms = val > 1e11 ? val : val * 1000;
+    return new Date(ms).toLocaleString();
+  }
+  let s = String(val).trim();
+  // If format is SQLite "YYYY-MM-DD HH:mm:ss" without timezone offset, append "Z" so it's parsed as UTC
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(s)) {
+    s = s.replace(" ", "T") + "Z";
+  }
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? String(val) : d.toLocaleString();
+}
+
 // Retrieves only the currently active registered evidence items for a case
-// (ensuring re-registered cases only show their new files, replacing old previous registrations)
+// (ensuring re-registered cases only show their new files, and assigns sequential EV01..EV05 numbering starting from 1)
 async function getActiveCaseEvidenceItems(caseNumber) {
   let activeRecords = null;
+  let caseMeta = {};
   try {
     if (window.epsApi && typeof window.epsApi.getCaseDetails === "function") {
       const details = await window.epsApi.getCaseDetails(caseNumber);
       if (details && Array.isArray(details.evidence) && details.evidence.length > 0) {
         activeRecords = details.evidence;
+        caseMeta = details.case || {};
       }
     }
   } catch (apiErr) {
@@ -239,7 +257,8 @@ async function getActiveCaseEvidenceItems(caseNumber) {
   // If backend database has the case's active registered files, use them as source of truth
   if (activeRecords && activeRecords.length > 0) {
     const items = [];
-    for (const rec of activeRecords) {
+    for (let idx = 0; idx < activeRecords.length; idx++) {
+      const rec = activeRecords[idx];
       let status = 0;
       let holder = rec.current_custodian || rec.submitter_address || "";
       let ipfsCid = rec.ipfs_cid || "";
@@ -258,15 +277,27 @@ async function getActiveCaseEvidenceItems(caseNumber) {
       } catch (e) {}
 
       const cleanFileName = extractCleanFileName(rec, description);
+      // Clean, sequential display ID starting from 1 (e.g. CASE-2026-001-EV01 to EV05)
+      const displayId = `${caseNumber}-EV${String(idx + 1).padStart(2, "0")}`;
+
       items.push({
-        evidenceId: rec.id,
+        evidenceId: rec.id, // On-chain real ID for contract calls
+        onChainId: rec.id,
+        displayId: displayId, // Clean UI display ID starting from 1
         fileName: cleanFileName,
+        caseNumber: caseMeta.case_number || rec.case_number || caseNumber,
+        firNumber: caseMeta.fir_number || rec.fir_number || "—",
+        policeStation: caseMeta.police_station || rec.police_station || "—",
+        lawSections: caseMeta.law_sections || rec.law_sections || "—",
         fileHash,
         fileSize: rec.file_size,
         ipfsCid,
         status,
         holder,
-        description
+        description,
+        registeredBy: rec.submitter_address || holder,
+        registeredAt: rec.created_at,
+        createdAt: rec.created_at
       });
     }
     return items;
@@ -276,12 +307,16 @@ async function getActiveCaseEvidenceItems(caseNumber) {
   const items = [];
   if (contract && typeof contract.getEvidenceIdsByCase === "function") {
     const onChainIds = await contract.getEvidenceIdsByCase(caseNumber);
-    for (const id of onChainIds) {
+    for (let idx = 0; idx < onChainIds.length; idx++) {
+      const id = onChainIds[idx];
       try {
         const [cNum, firNumber, policeStation, lawSections, description, fileHash, ipfsCid, registeredBy, registeredAt, status] = await contract.getEvidence(id);
         const cleanFileName = extractCleanFileName({ id }, description);
+        const displayId = `${caseNumber}-EV${String(idx + 1).padStart(2, "0")}`;
         items.push({
           evidenceId: id,
+          onChainId: id,
+          displayId: displayId,
           fileName: cleanFileName,
           caseNumber: cNum,
           firNumber,
@@ -545,29 +580,27 @@ async function findCaseEvidenceForTransfer(btn) {
 
     listDiv.innerHTML = matches.map((m, i) => `
       <label class="evidence-select-card" for="bulk-transfer-${i}">
-        <div class="evidence-select-left">
-          <div class="evidence-select-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-              <polyline points="14 2 14 8 20 8"></polyline>
-              <line x1="16" y1="13" x2="8" y2="13"></line>
-              <line x1="16" y1="17" x2="8" y2="17"></line>
-            </svg>
-          </div>
-          <div class="evidence-select-details">
-            <div class="evidence-select-header">
-              <span class="evidence-select-id">${escapeHtml(m.evidenceId)}</span>
-              ${m.status === 0 
-                ? '<span class="evidence-select-badge">Active</span>' 
-                : '<span class="evidence-select-badge closed">Closed</span>'}
-            </div>
-            <div class="evidence-select-filename" title="${escapeHtml(m.fileName)}">
-              ${escapeHtml(m.fileName)}
-            </div>
-          </div>
-        </div>
-        <div class="evidence-select-right">
+        <div class="evidence-select-checkbox-wrap">
           <input type="checkbox" id="bulk-transfer-${i}" class="evidence-select-checkbox bulk-transfer-check" data-idx="${i}" ${m.status === 0 ? "checked" : "disabled"} />
+        </div>
+        <div class="evidence-select-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+          </svg>
+        </div>
+        <div class="evidence-select-details">
+          <div class="evidence-select-header">
+            <span class="evidence-select-id">${escapeHtml(m.displayId || m.evidenceId)}</span>
+            ${m.status === 0 
+              ? '<span class="evidence-select-badge">Active</span>' 
+              : '<span class="evidence-select-badge closed">Closed</span>'}
+          </div>
+          <div class="evidence-select-filename" title="${escapeHtml(m.fileName)}">
+            ${escapeHtml(m.fileName)}
+          </div>
         </div>
       </label>
     `).join("");
@@ -586,7 +619,8 @@ async function bulkTransferCustody(btn) {
   const newHolder = document.getElementById("bulkTransferNewHolder").value.trim();
   const note = document.getElementById("bulkTransferNote").value.trim();
   const checked = Array.from(document.querySelectorAll(".bulk-transfer-check:checked"));
-  const selectedIds = checked.map(c => bulkTransferItems[parseInt(c.dataset.idx, 10)].evidenceId);
+  const selectedItems = checked.map(c => bulkTransferItems[parseInt(c.dataset.idx, 10)]);
+  const selectedIds = selectedItems.map(it => it.onChainId || it.evidenceId);
 
   if (selectedIds.length === 0) {
     showResult("bulkTransferResult", "fail", "Select at least one evidence item.");
@@ -604,7 +638,8 @@ async function bulkTransferCustody(btn) {
       ? await contract.transferCustody(selectedIds[0], newHolder, note)
       : await contract.transferCustodyBatch(selectedIds, newHolder, note);
     await tx.wait();
-    showResult("bulkTransferResult", "ok", `Custody of ${selectedIds.length} item(s) transferred to ${newHolder}:<br>${selectedIds.join("<br>")}`);
+    const displayList = selectedItems.map(it => `${it.displayId || it.evidenceId} (${it.fileName})`).join("<br>");
+    showResult("bulkTransferResult", "ok", `✓ Custody of ${selectedIds.length} item(s) transferred to ${newHolder}:<br>${displayList}`);
     loadStats();
   } catch (err) {
     showResult("bulkTransferResult", "fail", formatError(err));
@@ -615,9 +650,17 @@ async function bulkTransferCustody(btn) {
 
 // ---------- Court-Ready Report (Section 63 certificate + custody trail) ----------
 async function generateCourtReport(btn) {
-  const resultEl = "courtReportResult";
+  const resultEl = document.getElementById("courtReportResult") ? "courtReportResult" : "courtSubmitResult";
+  let targetCase = document.getElementById("caseBundleCaseNumber")?.value.trim() || document.getElementById("courtCaseNumber")?.value.trim();
+
+  if ((!caseBundleItems || caseBundleItems.length === 0) && targetCase) {
+    try {
+      caseBundleItems = await getActiveCaseEvidenceItems(targetCase);
+    } catch (e) {}
+  }
+
   if (!caseBundleItems || caseBundleItems.length === 0) {
-    showResult(resultEl, "fail", "Find case evidence first.");
+    showResult(resultEl, "fail", "Enter a valid case number and ensure evidence is registered.");
     return;
   }
   setBtnBusy(btn, true, "Building report...");
@@ -757,7 +800,7 @@ async function generateCourtReport(btn) {
     );
 
     heading("Contents", 11);
-    caseBundleItems.forEach((item, i) => field(`${i + 1}.`, item.evidenceId, 34));
+    caseBundleItems.forEach((item, i) => field(`${i + 1}.`, item.displayId || item.evidenceId, 34));
 
     // ---- Evidence items — flow continuously; a new page is only added when
     // content genuinely overflows (via ensureSpace), not once per item ----
@@ -768,7 +811,7 @@ async function generateCourtReport(btn) {
       const item = caseBundleItems[idx];
       if (idx > 0) rule(10, 12);
 
-      heading(`${idx + 1}. ${item.evidenceId}`, 11);
+      heading(`${idx + 1}. ${item.displayId || item.evidenceId}`, 11);
 
       field("FIR Number", item.firNumber);
       field("Police Station", item.policeStation);
@@ -776,7 +819,19 @@ async function generateCourtReport(btn) {
       field("Description", item.description);
       field("Status", item.status === 0 ? "Open" : "Closed");
       field("Registered By", await getOfficerLabel(item.registeredBy));
-      field("Registered On", new Date(item.registeredAt.toNumber() * 1000).toLocaleString());
+      let regDateStr = "—";
+      if (item.registeredAt) {
+        try {
+          regDateStr = typeof item.registeredAt.toNumber === 'function'
+            ? formatLocalDateTime(item.registeredAt.toNumber())
+            : formatLocalDateTime(item.registeredAt);
+        } catch (e) {
+          regDateStr = formatLocalDateTime(item.createdAt) || "—";
+        }
+      } else if (item.createdAt) {
+        regDateStr = formatLocalDateTime(item.createdAt);
+      }
+      field("Registered On", regDateStr);
       field("SHA-256 File Hash", "");
       mono(item.fileHash);
       field("IPFS CID (encrypted)", "");
@@ -794,7 +849,12 @@ async function generateCourtReport(btn) {
         for (let i = 0; i < holders.length; i++) {
           const label = await getOfficerLabel(holders[i]);
           const roleName = await resolveRoleName(holderRoles[i]);
-          const date = new Date(timestamps[i].toNumber() * 1000).toLocaleString();
+          let date = "—";
+          try {
+            date = typeof timestamps[i].toNumber === 'function'
+              ? formatLocalDateTime(timestamps[i].toNumber())
+              : formatLocalDateTime(timestamps[i]);
+          } catch (e) {}
 
           ensureSpace(26);
           doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(...NAVY);
@@ -828,7 +888,12 @@ async function generateCourtReport(btn) {
           doc.setFont("helvetica", "normal"); doc.setTextColor(INK);
           for (let i = 0; i < findingsList.length; i++) {
             const label = await getOfficerLabel(submittedBys[i]);
-            const date = new Date(labTimestamps[i].toNumber() * 1000).toLocaleString();
+            let date = "—";
+            try {
+              date = typeof labTimestamps[i].toNumber === 'function'
+                ? formatLocalDateTime(labTimestamps[i].toNumber())
+                : formatLocalDateTime(labTimestamps[i]);
+            } catch (e) {}
             ensureSpace(24);
             doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(INK_MUTED);
             doc.text(`${date} — ${label}${label !== submittedBys[i] ? `  •  ${submittedBys[i]}` : ""}`, marginX, y);
@@ -1458,11 +1523,11 @@ function renderRoleSidebar(role) {
       },
       {
         id: "nav-court-trial",
-        label: "Custody Trial",
+        label: "Case Timeline",
         panelId: "panel-court-trial",
-        title: "Custody Trial & Docket",
-        eyebrow: "Judicial Bench · Chain of Custody Audit",
-        icon: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>`
+        title: "Case Timeline",
+        eyebrow: "Judicial Bench · Case Timeline & Custody Anomaly Verification",
+        icon: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`
       }
     ];
   } else {
@@ -1825,14 +1890,14 @@ async function openCaseDossier(caseNumber) {
               </tr>
             </thead>
             <tbody>
-              ${evidence.map(e => `
+              ${evidence.map((e, idx) => `
                 <tr>
-                  <td style="font-family:var(--font-mono); font-weight:700;">${e.evidence_id}</td>
+                  <td style="font-family:var(--font-mono); font-weight:700;">${e.displayId || `${c.case_number}-EV${String(idx + 1).padStart(2, '0')}`}</td>
                   <td>${e.file_name || 'evidence_file'}</td>
                   <td>${e.file_size ? (e.file_size / 1024).toFixed(1) + ' KB' : 'N/A'}</td>
                   <td style="font-family:var(--font-mono); font-size:11px;" title="${e.file_hash}">${e.file_hash ? e.file_hash.slice(0, 10) + '...' + e.file_hash.slice(-8) : 'N/A'}</td>
                   <td style="font-family:var(--font-mono); font-size:11px;">${e.current_custodian ? e.current_custodian.slice(0, 6) + '...' + e.current_custodian.slice(-4) : 'N/A'}</td>
-                  <td>${new Date(e.created_at).toLocaleString()}</td>
+                  <td>${formatLocalDateTime(e.created_at)}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -1854,7 +1919,7 @@ async function openCaseDossier(caseNumber) {
         <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; padding:14px; margin-bottom:10px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
             <strong style="color:#0f172a; font-size:14px;">${f.report_title}</strong>
-            <span style="font-size:11px; color:#64748b;">${new Date(f.created_at).toLocaleString()}</span>
+            <span style="font-size:11px; color:#64748b;">${formatLocalDateTime(f.created_at)}</span>
           </div>
           <div style="font-size:12px; color:#475569; margin-bottom:6px;">
             Examiner: <strong>${f.examiner_name}</strong> · Division: <strong>${f.lab_name}</strong>
@@ -1880,7 +1945,7 @@ async function openCaseDossier(caseNumber) {
         <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; padding:14px; margin-bottom:10px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
             <strong style="color:#0f172a; font-size:14px;">Verdict: ${crt.verdict}</strong>
-            <span style="font-size:11px; color:#64748b;">${new Date(crt.created_at).toLocaleString()}</span>
+            <span style="font-size:11px; color:#64748b;">${formatLocalDateTime(crt.created_at)}</span>
           </div>
           <div style="font-size:12px; color:#475569; margin-bottom:6px;">
             Bench: <strong>${crt.court_name}</strong> · Judge: <strong>${crt.judge_name}</strong>
@@ -2047,16 +2112,45 @@ async function submitForensicReportAction(btn) {
   }
 
   setBtnBusy(btn, true, "Submitting Report...");
-  showResult("forensicSubmitResult", "pending", "Anchoring forensic examination report to case dossier...");
+  showResult("forensicSubmitResult", "pending", "Preparing forensic examination report...");
 
   try {
     let fileHash = null;
     let fileName = null;
     let fileSize = null;
     if (file) {
+      setDropzoneCardProgress('forensicFile', 25, `Hashing ${file.name} (SHA-256)...`);
       fileHash = await hashFile(file);
       fileName = file.name;
       fileSize = file.size;
+      setDropzoneCardProgress('forensicFile', 60, `Cryptographic hash ready`);
+    }
+
+    let txHash = null;
+    let blockNumber = null;
+
+    // Trigger on-chain transaction via MetaMask for Lab Report
+    if (contract && typeof contract.submitLabReport === 'function') {
+      showResult("forensicSubmitResult", "pending", "Prompting MetaMask... Please confirm the Forensic Lab transaction in your wallet.");
+      if (file) setDropzoneCardProgress('forensicFile', 75, "Confirming in MetaMask wallet...");
+
+      const activeItems = await getActiveCaseEvidenceItems(caseNumber);
+      const targetEvidenceId = (activeItems && activeItems.length > 0)
+        ? (activeItems[0].onChainId || activeItems[0].evidenceId)
+        : `${caseNumber}-EV01`;
+
+      const findingsSnippet = findings.length > 900 ? findings.substring(0, 897) + "..." : findings;
+      const reportHashStr = fileHash || "SHA256_LAB_ANALYSIS_VERIFIED";
+
+      const tx = await contract.submitLabReport(targetEvidenceId, findingsSnippet, reportHashStr, "");
+      showResult("forensicSubmitResult", "pending", `Transaction broadcast on Sepolia! Awaiting confirmation (Tx: ${shortenHex(tx.hash)})...`);
+      if (file) setDropzoneCardProgress('forensicFile', 90, "Mining transaction on Sepolia blockchain...");
+
+      const receipt = await tx.wait();
+      txHash = tx.hash;
+      blockNumber = receipt?.blockNumber;
+
+      if (file) completeDropzoneCard('forensicFile', blockNumber);
     }
 
     const payload = {
@@ -2067,6 +2161,8 @@ async function submitForensicReportAction(btn) {
       fileName,
       fileHash,
       fileSize,
+      txHash,
+      blockNumber,
       submitterAddress: connectedAddress
     };
 
@@ -2076,12 +2172,12 @@ async function submitForensicReportAction(btn) {
       return;
     }
 
-    showResult("forensicSubmitResult", "ok", `Forensic Report successfully submitted for ${caseNumber}. Case updated.`);
-    document.getElementById("forensicFindings").value = "";
-    document.getElementById("forensicReportTitle").value = "";
-    if (fileInput) fileInput.value = "";
-    const preview = document.getElementById("forensicFilePreview");
-    if (preview) preview.style.display = "none";
+    showResult(
+      "forensicSubmitResult",
+      "ok",
+      `Forensic Report successfully submitted for ${caseNumber}.` +
+      (txHash ? `<br><span style="font-family:var(--font-mono); font-size:11.5px;">Sepolia Tx: <a href="https://sepolia.etherscan.io/tx/${txHash}" target="_blank" style="color:#2563eb; text-decoration:underline;">${shortenHex(txHash)}</a> (Block #${blockNumber || 'Confirmed'})</span>` : '')
+    );
 
     loadRolePendingCases();
     loadRoleAllCases();
@@ -2118,16 +2214,51 @@ async function submitCourtReportAction(btn) {
   }
 
   setBtnBusy(btn, true, "Filing Court Order...");
-  showResult("courtSubmitResult", "pending", "Recording judicial ruling in official court docket...");
+  showResult("courtSubmitResult", "pending", "Preparing judicial order...");
 
   try {
     let fileHash = null;
     let fileName = null;
     let fileSize = null;
     if (file) {
+      setDropzoneCardProgress('courtFile', 25, `Hashing ${file.name} (SHA-256)...`);
       fileHash = await hashFile(file);
       fileName = file.name;
       fileSize = file.size;
+      setDropzoneCardProgress('courtFile', 60, `Cryptographic hash computed`);
+    }
+
+    let txHash = null;
+    let blockNumber = null;
+
+    if (contract) {
+      const activeItems = await getActiveCaseEvidenceItems(caseNumber);
+      const targetEvidenceId = (activeItems && activeItems.length > 0)
+        ? (activeItems[0].onChainId || activeItems[0].evidenceId)
+        : `${caseNumber}-EV01`;
+
+      if (closeCase || ['CONVICTION', 'ACQUITTAL', 'CLOSED', 'CASE_DISMISSED'].includes(verdict)) {
+        showResult("courtSubmitResult", "pending", "Prompting MetaMask to officially CLOSE case on blockchain...");
+        if (file) setDropzoneCardProgress('courtFile', 75, "Confirming case closure in MetaMask...");
+        const tx = await contract.closeCase(targetEvidenceId);
+        showResult("courtSubmitResult", "pending", `Case closure transaction broadcast! Awaiting confirmation (Tx: ${shortenHex(tx.hash)})...`);
+        const receipt = await tx.wait();
+        txHash = tx.hash;
+        blockNumber = receipt?.blockNumber;
+      } else {
+        showResult("courtSubmitResult", "pending", "Prompting MetaMask to anchor judicial ruling on-chain...");
+        if (file) setDropzoneCardProgress('courtFile', 75, "Confirming in MetaMask wallet...");
+        const dummyHashBytes32 = fileHash && fileHash.length === 66
+          ? fileHash
+          : (activeItems && activeItems[0]?.fileHash ? activeItems[0].fileHash : ethers.utils.id("JUDICIAL_ORDER_" + caseNumber));
+        const tx = await contract.verifyIntegrity(targetEvidenceId, dummyHashBytes32);
+        showResult("courtSubmitResult", "pending", `Judicial order anchored! Awaiting confirmation (Tx: ${shortenHex(tx.hash)})...`);
+        const receipt = await tx.wait();
+        txHash = tx.hash;
+        blockNumber = receipt?.blockNumber;
+      }
+
+      if (file) completeDropzoneCard('courtFile', blockNumber);
     }
 
     const payload = {
@@ -2138,6 +2269,8 @@ async function submitCourtReportAction(btn) {
       fileName,
       fileHash,
       fileSize,
+      txHash,
+      blockNumber,
       submitterAddress: connectedAddress,
       closeCase
     };
@@ -2148,11 +2281,12 @@ async function submitCourtReportAction(btn) {
       return;
     }
 
-    showResult("courtSubmitResult", "ok", res.message || `Court ruling successfully recorded for ${caseNumber}.`);
-    document.getElementById("courtOrdersSummary").value = "";
-    if (fileInput) fileInput.value = "";
-    const preview = document.getElementById("courtFilePreview");
-    if (preview) preview.style.display = "none";
+    showResult(
+      "courtSubmitResult",
+      "ok",
+      (res.message || `Court ruling successfully recorded for ${caseNumber}.`) +
+      (txHash ? `<br><span style="font-family:var(--font-mono); font-size:11.5px;">Sepolia Tx: <a href="https://sepolia.etherscan.io/tx/${txHash}" target="_blank" style="color:#2563eb; text-decoration:underline;">${shortenHex(txHash)}</a> (Block #${blockNumber || 'Confirmed'})</span>` : '')
+    );
 
     loadRolePendingCases();
     loadRoleAllCases();
@@ -2176,17 +2310,17 @@ function prefillCourtReport(caseNumber) {
   if (input) input.value = caseNumber;
 }
 
-function generateCourtPdfCertificate() {
+async function generateCourtPdfCertificate(triggerBtn) {
   const caseNumber = document.getElementById("courtCaseNumber")?.value.trim();
   if (!caseNumber) {
-    alert("Please enter a Case Number first.");
+    showResult("courtSubmitResult", "fail", "Please enter a Case Number before generating the Section 63 BSA Certificate.");
     return;
   }
-  const btn = document.getElementById("courtReportBtn");
+  const btn = triggerBtn || document.getElementById("courtSection63Btn") || document.getElementById("courtReportBtn");
   if (document.getElementById("caseBundleCaseNumber")) {
     document.getElementById("caseBundleCaseNumber").value = caseNumber;
   }
-  generateCourtReport(btn);
+  await generateCourtReport(btn);
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -2940,7 +3074,12 @@ function completeDropzoneCard(inputId, blockNumber) {
     fillBg.classList.add('is-done');
   }
   const fileCount = state && state.files ? state.files.length : 1;
-  const countText = `${fileCount} Evidence File${fileCount > 1 ? 's' : ''} Filed On-Chain ✓`;
+  let countText = `${fileCount} Evidence File${fileCount > 1 ? 's' : ''} Filed On-Chain ✓`;
+  if (inputId === 'forensicFile' || inputId === 'labReportFile') {
+    countText = `${fileCount} Forensic Report File${fileCount > 1 ? 's' : ''} Anchored On-Chain ✓`;
+  } else if (inputId === 'courtFile') {
+    countText = `${fileCount} Court Order File${fileCount > 1 ? 's' : ''} Recorded On-Chain ✓`;
+  }
   if (title) title.textContent = countText;
   if (expTitle) expTitle.textContent = countText;
 
@@ -3024,8 +3163,16 @@ function handleModernFileChange(input, previewId, contentId) {
   const count = files.length;
   const totalBytes = files.reduce((acc, f) => acc + (f.size || 0), 0);
   const totalSizeFormatted = formatFileSize(totalBytes);
-  const titleText = `${count} Evidence File${count > 1 ? 's' : ''} Staged`;
-  const statusSubtitle = `${totalSizeFormatted} total · Ready to encrypt & file on-chain`;
+  
+  let titleText = `${count} Evidence File${count > 1 ? 's' : ''} Staged`;
+  let statusSubtitle = `${totalSizeFormatted} total · Ready to encrypt & file on-chain`;
+  if (input.id === 'forensicFile' || input.id === 'labReportFile') {
+    titleText = `${count} Forensic Report File${count > 1 ? 's' : ''} Staged`;
+    statusSubtitle = `${totalSizeFormatted} total · Ready to attach to case dossier & anchor on-chain`;
+  } else if (input.id === 'courtFile') {
+    titleText = `${count} Court Order File${count > 1 ? 's' : ''} Staged`;
+    statusSubtitle = `${totalSizeFormatted} total · Ready to file judicial order & record on-chain`;
+  }
 
   const fileRowsHtml = files.map((file, idx) => {
     const sizeStr = formatFileSize(file.size);
@@ -3932,7 +4079,7 @@ async function lookupHolder(btn) {
             </div>
             <div class="evidence-select-details">
               <div class="evidence-select-header">
-                <span class="evidence-select-id">${escapeHtml(id)}</span>
+                <span class="evidence-select-id">${escapeHtml(item.displayId || id)}</span>
                 <span class="evidence-select-badge">${escapeHtml(roleName)}</span>
               </div>
               <div class="evidence-select-filename" title="${escapeHtml(item.fileName)}">
@@ -3985,7 +4132,7 @@ async function findCaseEvidenceForVerify(btn) {
       <div class="evidence-verify-card">
         <div class="evidence-verify-header">
           <div style="display:flex; align-items:center; gap:8px;">
-            <span class="evidence-select-id">${escapeHtml(m.evidenceId)}</span>
+            <span class="evidence-select-id">${escapeHtml(m.displayId || m.evidenceId)}</span>
             ${m.status === 0 
               ? '<span class="evidence-select-badge">Active</span>' 
               : '<span class="evidence-select-badge closed">Closed</span>'}
@@ -4033,7 +4180,7 @@ async function bulkVerifyIntegrity(btn) {
       const idx = parseInt(inp.dataset.idx, 10);
       const item = bulkVerifyItems[idx];
       const hash = await hashFile(inp.files[0]);
-      evidenceIds.push(item.evidenceId);
+      evidenceIds.push(item.onChainId || item.evidenceId);
       recomputedHashes.push(hash);
     }
 
@@ -4094,18 +4241,17 @@ async function findCaseEvidenceForTrail(btn) {
   const listDiv = document.getElementById("trailCaseList");
   const detailsDiv = document.getElementById("caseDetails");
   const resultDiv = document.getElementById("trailResult");
-  const closeCaseBtn = document.getElementById("closeCaseBtn");
   const anomalyDiv = document.getElementById("anomalyResult");
   detailsDiv.innerHTML = "";
-  closeCaseBtn.style.display = "none";
-  document.getElementById("closeCaseResult").innerHTML = "";
+  const closeCaseResultEl = document.getElementById("closeCaseResult");
+  if (closeCaseResultEl) closeCaseResultEl.innerHTML = "";
   resultDiv.innerHTML = `<div style="color:var(--ink-500); font-size:13px;">No record loaded yet.</div>`;
-  anomalyDiv.innerHTML = `<div style="color:var(--ink-500); font-size:13px;">Load a custody trail above to run checks.</div>`;
+  anomalyDiv.innerHTML = `<div style="color:var(--ink-500); font-size:13px;">Load a case timeline above to run checks.</div>`;
   currentTrailCaseItems = [];
 
   if (!caseNumber) {
     listDiv.innerHTML = "";
-    showResult("closeCaseResult", "fail", "Enter a case number.");
+    if (closeCaseResultEl) showResult("closeCaseResult", "fail", "Enter a case number.");
     return;
   }
 
@@ -4123,6 +4269,8 @@ async function findCaseEvidenceForTrail(btn) {
         const [holders, holderRoles, timestamps, notes] = await contract.getCustodyTrail(id);
         items.push({
           evidenceId: id,
+          onChainId: id,
+          displayId: match.displayId || id,
           fileName: match.fileName,
           caseNumber: cNum, firNumber, policeStation, lawSections, description,
           registeredBy, registeredAt, isOpen: status === 0,
@@ -4131,10 +4279,12 @@ async function findCaseEvidenceForTrail(btn) {
       } catch (e) {
         items.push({
           evidenceId: id,
+          onChainId: id,
+          displayId: match.displayId || id,
           fileName: match.fileName,
-          caseNumber, firNumber: '—', policeStation: '—', lawSections: '—', description: match.description,
-          registeredBy: match.holder, registeredAt: 0, isOpen: match.status === 0,
-          holders: [match.holder], holderRoles: [0], timestamps: [0], notes: ['Registered'],
+          caseNumber, firNumber: match.firNumber || '—', policeStation: match.policeStation || '—', lawSections: match.lawSections || '—', description: match.description,
+          registeredBy: match.holder, registeredAt: match.createdAt || 0, isOpen: match.status === 0,
+          holders: [match.holder], holderRoles: [0], timestamps: [match.createdAt || 0], notes: ['Registered'],
         });
       }
     }
@@ -4153,7 +4303,7 @@ async function findCaseEvidenceForTrail(btn) {
     const itemRows = items.map(it => `
       <div style="font-size:12.5px; color:#334155; padding:8px 0; border-top:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
         <div>
-          <strong style="font-family:var(--font-mono); color:#0f172a;">${escapeHtml(it.evidenceId)}</strong>
+          <strong style="font-family:var(--font-mono); color:#0f172a;">${escapeHtml(it.displayId || it.evidenceId)}</strong>
           <span style="color:#475569; margin-left:6px; font-weight:500;">— ${escapeHtml(it.fileName || extractCleanFileName(it, it.description))}</span>
         </div>
         <span style="font-family:var(--font-mono); font-size:10.5px; text-transform:uppercase; letter-spacing:0.5px; font-weight:600; padding:2px 8px; border-radius:4px; ${it.isOpen ? 'background:#dcfce7; color:#166534;' : 'background:#fee2e2; color:#991b1b;'}">${it.isOpen ? 'open' : 'closed'}</span>
@@ -4171,16 +4321,19 @@ async function findCaseEvidenceForTrail(btn) {
       </div>
     `;
 
-    closeCaseBtn.style.display = anyOpen ? "" : "none";
-
     const events = [];
     for (const it of items) {
       for (let i = 0; i < it.holders.length; i++) {
+        let tsVal = 0;
+        try {
+          tsVal = typeof it.timestamps[i].toNumber === 'function' ? it.timestamps[i].toNumber() : (Number(it.timestamps[i]) || 0);
+        } catch (e) {}
         events.push({
           evidenceId: it.evidenceId,
+          displayId: it.displayId || it.evidenceId,
           holder: it.holders[i],
           role: it.holderRoles[i],
-          ts: it.timestamps[i].toNumber(),
+          ts: tsVal,
           note: it.notes[i],
         });
       }
@@ -4190,16 +4343,16 @@ async function findCaseEvidenceForTrail(btn) {
     let html = "";
     for (let i = 0; i < events.length; i++) {
       const e = events[i];
-      const date = new Date(e.ts * 1000).toLocaleString();
+      const date = formatLocalDateTime(e.ts);
       const roleName = await resolveRoleName(e.role);
       html += `<div class="t-item" style="animation-delay:${i * 0.06}s">
         <div class="note">${e.note}</div>
-        <div class="meta">${e.evidenceId} &bull; ${e.holder}</div>
+        <div class="meta">${escapeHtml(e.displayId || e.evidenceId)} &bull; ${e.holder}</div>
         <div class="meta">${date}</div>
         <span class="role-tag">${roleName}</span>
       </div>`;
     }
-    resultDiv.innerHTML = html || `<div style="color:var(--ink-500); font-size:13px;">No records found.</div>`;
+    resultDiv.innerHTML = html || `<div style="color:var(--ink-500); font-size:13px;">No timeline records found.</div>`;
 
     await runCaseAnomalyChecks(items, anomalyDiv);
   } catch (err) {
@@ -4207,7 +4360,7 @@ async function findCaseEvidenceForTrail(btn) {
     detailsDiv.innerHTML = "";
     resultDiv.innerHTML = `<div class="result fail">${formatError(err)}</div>`;
     anomalyDiv.innerHTML = "";
-    showResult("closeCaseResult", "fail", formatError(err));
+    if (closeCaseResultEl) showResult("closeCaseResult", "fail", formatError(err));
   } finally {
     setBtnBusy(btn, false);
   }

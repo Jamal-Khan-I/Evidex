@@ -69,10 +69,12 @@ router.post('/', (req, res, next) => {
       });
     }
 
+    const nowIso = new Date().toISOString();
+
     db.run(
       `INSERT INTO evidence_records 
-       (id, case_number, file_name, file_hash, file_size, mime_type, description, submitter_address, current_custodian, tx_hash, block_number)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       (id, case_number, file_name, file_hash, file_size, mime_type, description, submitter_address, current_custodian, tx_hash, block_number, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          case_number = excluded.case_number,
          file_name = excluded.file_name,
@@ -94,7 +96,8 @@ router.post('/', (req, res, next) => {
         submitterAddress ? submitterAddress.toLowerCase() : null,
         currentCustodian ? currentCustodian.toLowerCase() : (submitterAddress ? submitterAddress.toLowerCase() : null),
         txHash || null,
-        blockNumber || null
+        blockNumber || null,
+        nowIso
       ]
     );
 

@@ -496,7 +496,7 @@
             <button class="btn-primary" onclick="submitCourtReportAction(this)" style="flex:2; padding:14px; font-weight:700;">
               Record Judicial Ruling & Docket Order
             </button>
-            <button type="button" class="btn-secondary" onclick="generateCourtPdfCertificate()" style="flex:1; padding:14px;">
+            <button type="button" id="courtSection63Btn" class="btn-secondary" onclick="generateCourtPdfCertificate(this)" style="flex:1; padding:14px;">
               📄 Section 63 BSA Certificate
             </button>
           </div>
@@ -504,12 +504,12 @@
         </div>
       </div>
 
-      <!-- PANEL 6: COURT - CUSTODY TRIAL (FOURTH COURT OPTION) -->
+      <!-- PANEL 6: COURT - CASE TIMELINE (FOURTH COURT OPTION) -->
       <div class="workspace-panel" id="panel-court-trial">
         <div class="panel-card">
           <div class="card-head">
-            <h2>Custody Trail & Forensic Docket</h2>
-            <p class="card-subtitle">Inspect the complete hand-to-hand custody history and rule-based anomaly audit for the case.</p>
+            <h2>Case Timeline</h2>
+            <p class="card-subtitle">Inspect the chronological case events, exhibits timeline, and rule-based custody anomaly verification.</p>
           </div>
 
           <div class="form-grid-2">
@@ -518,20 +518,18 @@
               <input id="trailCaseNumber" placeholder="CASE-2026-014" />
             </div>
             <div class="field-wrap" style="display:flex; align-items:flex-end;">
-              <button class="btn-secondary btn-block" onclick="findCaseEvidenceForTrail(this)" style="padding:11px;">Find Evidence & Load Trail</button>
+              <button class="btn-secondary btn-block" onclick="findCaseEvidenceForTrail(this)" style="padding:11px;">Load Case Timeline</button>
             </div>
           </div>
 
           <div id="trailCaseList" style="margin-top:14px;"></div>
           <div id="caseDetails" style="margin-top:18px;"></div>
-          <button class="btn-secondary btn-block" id="closeCaseBtn" style="display:none;" onclick="closeCaseAction(this)">Close Case (Court Only)</button>
-          <div id="closeCaseResult"></div>
 
-          <div class="dossier-section-header" style="margin-top:24px;">Docket Timeline</div>
+          <div class="dossier-section-header" style="margin-top:24px;">Case Timeline</div>
           <div id="trailResult" class="timeline"><div style="color:var(--ink-500); font-size:13px;">No record loaded yet. Enter a case number above.</div></div>
 
           <div class="dossier-section-header" style="margin-top:24px;">Custody Anomaly Verification</div>
-          <div id="anomalyResult"><div style="color:var(--ink-500); font-size:13px;">Load a custody trail above to run rule-based integrity checks.</div></div>
+          <div id="anomalyResult"><div style="color:var(--ink-500); font-size:13px;">Load a case timeline above to run rule-based integrity checks.</div></div>
         </div>
       </div>
 
@@ -702,7 +700,7 @@
               </a>
             </div>
             <p style="font-size: 12.5px; color: #64748b; margin-bottom: 12px; line-height: 1.5;">
-              Powers Evidex AI with ultra-fast LPU inference (GPT-OSS 120B / 20B). Enables full conversational intelligence on any topic, live blockchain case analysis, and investigative storytelling without canned or scripted answers.
+              Powers Evidex AI with ultra-fast LPU inference (GPT-OSS 120B / 20B). Enables full conversational intelligence on any topic, live blockchain case analysis, and investigative case briefing and analysis without canned or scripted answers.
             </p>
             <div style="display: flex; gap: 10px;">
               <input type="password" id="adminGroqApiKey" placeholder="gsk_..." style="flex: 1; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-family: monospace; font-size: 13px;" />
