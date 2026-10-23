@@ -886,8 +886,8 @@
             <div class="dynamic-dept-title">Police Department Details</div>
             <div class="form-row-2">
               <div class="reg-field-group">
-                <label for="regPoliceStation">Police Station Name &amp; Code</label>
-                <input id="regPoliceStation" placeholder="e.g. Chennai Central — B1 North Beach PS" oninput="validateRegistrationForm()" />
+                <label for="regOfficerPoliceStation">Police Station Name &amp; Code</label>
+                <input id="regOfficerPoliceStation" placeholder="e.g. Chennai Central — B1 North Beach PS" oninput="validateRegistrationForm()" />
               </div>
               <div class="reg-field-group">
                 <label for="regDistrict">District / Commissionerate</label>
@@ -901,7 +901,7 @@
               </div>
               <div class="reg-field-group">
                 <label for="regRank">Rank / Designation</label>
-                <select id="regRank">
+                <select id="regRank" onchange="validateRegistrationForm()">
                   <option value="Inspector of Police">Inspector of Police</option>
                   <option value="Sub-Inspector (SI)">Sub-Inspector (SI)</option>
                   <option value="Head Constable">Head Constable</option>
@@ -927,7 +927,7 @@
             </div>
             <div class="reg-field-group" style="margin-top: 10px;">
               <label for="regSpecialization">Laboratory Division Specialization</label>
-              <select id="regSpecialization">
+              <select id="regSpecialization" onchange="validateRegistrationForm()">
                 <option value="Cyber Forensics &amp; Digital Evidence">Cyber Forensics &amp; Digital Evidence</option>
                 <option value="DNA &amp; Serology Division">DNA &amp; Serology Division</option>
                 <option value="Ballistics &amp; Firearms Analysis">Ballistics &amp; Firearms Analysis</option>
@@ -947,7 +947,7 @@
               </div>
               <div class="reg-field-group">
                 <label for="regCourtDesignation">Designation</label>
-                <select id="regCourtDesignation">
+                <select id="regCourtDesignation" onchange="validateRegistrationForm()">
                   <option value="Judicial Magistrate">Judicial Magistrate</option>
                   <option value="District &amp; Sessions Judge">District &amp; Sessions Judge</option>
                   <option value="Public Prosecutor">Public Prosecutor</option>

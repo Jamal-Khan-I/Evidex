@@ -6075,9 +6075,9 @@ function getMissingRegistrationFields() {
     issues.push({ field: 'regWalletAddress', msg: 'MetaMask Wallet: Please enter your 42-character Ethereum address (starts with 0x).' });
   }
   if (role === "POLICE") {
-    const station = (document.getElementById("regPoliceStation")?.value || "").trim();
+    const station = (document.getElementById("regOfficerPoliceStation")?.value || document.getElementById("regPoliceStation")?.value || "").trim();
     const badge = (document.getElementById("regBadgeNumber")?.value || "").trim();
-    if (station.length < 2) issues.push({ field: 'regPoliceStation', msg: 'Police Station: Please enter your police station name & code.' });
+    if (station.length < 2) issues.push({ field: 'regOfficerPoliceStation', msg: 'Police Station: Please enter your police station name & code.' });
     if (badge.length < 2) issues.push({ field: 'regBadgeNumber', msg: 'Badge Number: Please enter your badge / constabulary number.' });
   } else if (role === "FORENSICS") {
     const lab = (document.getElementById("regLabId")?.value || "").trim();
@@ -6130,7 +6130,7 @@ function validateRegistrationForm() {
   // Step 4: Department Info
   let deptDone = true;
   if (role === "POLICE") {
-    const station = (document.getElementById("regPoliceStation")?.value || "").trim();
+    const station = (document.getElementById("regOfficerPoliceStation")?.value || document.getElementById("regPoliceStation")?.value || "").trim();
     const badge = (document.getElementById("regBadgeNumber")?.value || "").trim();
     deptDone = station.length >= 2 && badge.length >= 2;
   } else if (role === "FORENSICS") {
@@ -6239,7 +6239,7 @@ async function submitOfficerRegistration() {
   let departmentData = {};
   if (role === "POLICE") {
     departmentData = {
-      policeStation: (document.getElementById("regPoliceStation")?.value || "").trim(),
+      policeStation: (document.getElementById("regOfficerPoliceStation")?.value || document.getElementById("regPoliceStation")?.value || "").trim(),
       district: (document.getElementById("regDistrict")?.value || "").trim(),
       badgeNumber: (document.getElementById("regBadgeNumber")?.value || "").trim(),
       rank: document.getElementById("regRank")?.value || "Inspector of Police"
