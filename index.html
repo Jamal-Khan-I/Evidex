@@ -225,28 +225,28 @@
           <div class="form-grid-2">
             <div class="field-wrap">
               <label>Case Number <span class="req">*</span></label>
-              <input id="regCaseNumber" placeholder="e.g. CASE-2026-014" />
+              <input id="regCaseNumber" name="caseNumber" autocomplete="on" placeholder="e.g. CASE-2026-014" />
             </div>
             <div class="field-wrap">
               <label>FIR Number <span class="req">*</span></label>
-              <input id="regFirNumber" placeholder="e.g. FIR No. 118/2026" />
+              <input id="regFirNumber" name="firNumber" autocomplete="on" placeholder="e.g. FIR No. 118/2026" />
             </div>
           </div>
 
           <div class="form-grid-2">
             <div class="field-wrap">
               <label>Police Station / Unit <span class="req">*</span></label>
-              <input id="regPoliceStation" placeholder="e.g. Madurai City — B4 Anna Nagar PS" />
+              <input id="regPoliceStation" name="policeStation" autocomplete="on" placeholder="e.g. Madurai City — B4 Anna Nagar PS" />
             </div>
             <div class="field-wrap">
               <label>Sections of Law Invoked <span class="req">*</span></label>
-              <input id="regLawSections" placeholder="e.g. BNS Sections 316(2), 336 / IT Act 66D" />
+              <input id="regLawSections" name="lawSections" autocomplete="on" placeholder="e.g. BNS Sections 316(2), 336 / IT Act 66D" />
             </div>
           </div>
 
           <div class="field-wrap">
             <label>Description of Incident & Seizure</label>
-            <input id="regDescription" placeholder="Seized hard drive, mobile handsets, digital storage devices..." />
+            <input id="regDescription" name="description" autocomplete="on" placeholder="Seized hard drive, mobile handsets, digital storage devices..." />
           </div>
 
           <!-- Forensics Request Toggle (Selectable) -->
@@ -291,7 +291,7 @@
           <div class="field-wrap">
             <label>Case Encryption Key (AES-256)</label>
             <div style="display:flex; gap:8px;">
-              <input id="regCaseKey" placeholder="Click Generate, or paste an existing case key" style="flex:1;" />
+              <input id="regCaseKey" name="caseKey" autocomplete="on" placeholder="Click Generate, or paste an existing case key" style="flex:1;" />
               <button type="button" class="btn-secondary" style="white-space:nowrap;" onclick="generateAndFillCaseKey()">Generate New</button>
             </div>
           </div>
@@ -356,29 +356,28 @@
           <div class="form-grid-2">
             <div class="field-wrap">
               <label>Case Number <span class="req">*</span></label>
-              <input id="forensicCaseNumber" placeholder="e.g. CASE-2026-014" list="forensicsCaseDatalist" />
-              <datalist id="forensicsCaseDatalist"></datalist>
+              <input id="forensicCaseNumber" name="caseNumber" autocomplete="on" placeholder="e.g. CASE-2026-014" />
             </div>
             <div class="field-wrap">
               <label>Report Title <span class="req">*</span></label>
-              <input id="forensicReportTitle" placeholder="e.g. Mobile Extraction & Deleted Chat Analysis" />
+              <input id="forensicReportTitle" name="reportTitle" autocomplete="on" placeholder="e.g. Mobile Extraction & Deleted Chat Analysis" />
             </div>
           </div>
 
           <div class="form-grid-2">
             <div class="field-wrap">
               <label>Laboratory Division / Institution</label>
-              <input id="forensicLabName" placeholder="Cyber Forensics Division, Forensic Sciences Department, Chennai" />
+              <input id="forensicLabName" name="labName" autocomplete="on" placeholder="Cyber Forensics Division, Forensic Sciences Department, Chennai" />
             </div>
             <div class="field-wrap">
               <label>Forensic Examiner / Scientific Officer Name</label>
-              <input id="forensicExaminerName" placeholder="Dr. S. Ramanathan, Senior Scientific Officer" />
+              <input id="forensicExaminerName" name="examinerName" autocomplete="on" placeholder="Dr. S. Ramanathan, Senior Scientific Officer" />
             </div>
           </div>
 
           <div class="field-wrap">
             <label>Examination Findings & Technical Observations <span class="req">*</span></label>
-            <textarea id="forensicFindings" rows="4" class="styled-textarea" placeholder="Detailed analysis findings, hash integrity matches, extracted artifacts, malware identification, or timeline reconstructions..."></textarea>
+            <input id="forensicFindings" name="forensicFindings" autocomplete="on" placeholder="Detailed analysis findings, hash integrity matches, extracted artifacts, malware identification, or timeline reconstructions..." />
           </div>
 
           <div class="field-wrap">
@@ -424,19 +423,18 @@
           <div class="form-grid-2">
             <div class="field-wrap">
               <label>Case Number <span class="req">*</span></label>
-              <input id="courtCaseNumber" placeholder="e.g. CASE-2026-014" list="courtCaseDatalist" />
-              <datalist id="courtCaseDatalist"></datalist>
+              <input id="courtCaseNumber" name="caseNumber" autocomplete="on" placeholder="e.g. CASE-2026-014" />
             </div>
             <div class="field-wrap">
               <label>Court Name / Judicial Bench <span class="req">*</span></label>
-              <input id="courtNameInput" placeholder="Principal Sessions Court, Chennai" />
+              <input id="courtNameInput" name="courtName" autocomplete="on" placeholder="Principal Sessions Court, Chennai" />
             </div>
           </div>
 
           <div class="form-grid-2">
             <div class="field-wrap">
               <label>Presiding Judge / Magistrate Name</label>
-              <input id="courtJudgeNameInput" placeholder="Honourable Justice K. Srinivasan" />
+              <input id="courtJudgeNameInput" name="judgeName" autocomplete="on" placeholder="Honourable Justice K. Srinivasan" />
             </div>
             <div class="field-wrap">
               <label>Judicial Verdict / Ruling Disposition <span class="req">*</span></label>
@@ -453,7 +451,7 @@
 
           <div class="field-wrap">
             <label>Ruling Directives & Orders Summary <span class="req">*</span></label>
-            <textarea id="courtOrdersSummary" rows="4" class="styled-textarea" placeholder="Summary of judicial order, evidence admissibility under BSA 2023, sentence or trial directives..."></textarea>
+            <input id="courtOrdersSummary" name="courtOrdersSummary" autocomplete="on" placeholder="Summary of judicial order, evidence admissibility under BSA 2023, sentence or trial directives..." />
           </div>
 
           <div class="field-wrap">
@@ -515,7 +513,7 @@
           <div class="form-grid-2">
             <div class="field-wrap">
               <label>Case Number</label>
-              <input id="trailCaseNumber" placeholder="CASE-2026-014" />
+              <input id="trailCaseNumber" name="caseNumber" autocomplete="on" placeholder="CASE-2026-014" />
             </div>
             <div class="field-wrap" style="display:flex; align-items:flex-end;">
               <button class="btn-secondary btn-block" onclick="findCaseEvidenceForTrail(this)" style="padding:11px;">Load Case Timeline</button>
@@ -544,7 +542,7 @@
           <div class="form-grid-2">
             <div class="field-wrap">
               <label>Case Number</label>
-              <input id="bulkVerifyCaseNumber" placeholder="CASE-2026-014" />
+              <input id="bulkVerifyCaseNumber" name="caseNumber" autocomplete="on" placeholder="CASE-2026-014" />
             </div>
             <div class="field-wrap" style="display:flex; align-items:flex-end;">
               <button class="btn-secondary btn-block" onclick="findCaseEvidenceForVerify(this)" style="padding:11px;">Find Case Evidence</button>
@@ -578,7 +576,7 @@
           <div class="field-wrap">
             <label>Lookup Current Holders for Case</label>
             <div style="display:flex; gap:8px;">
-              <input id="holderLookupCaseNumber" placeholder="CASE-2026-014" style="flex:1;" />
+              <input id="holderLookupCaseNumber" name="caseNumber" autocomplete="on" placeholder="CASE-2026-014" style="flex:1;" />
               <button class="btn-secondary" onclick="lookupHolder(this)">Check Holders</button>
             </div>
             <div id="holderResult" style="margin-top:10px;"></div>
@@ -589,7 +587,7 @@
           <div class="field-wrap">
             <label>Initiate Custody Transfer</label>
             <div style="display:flex; gap:8px;">
-              <input id="bulkTransferCaseNumber" placeholder="CASE-2026-014" style="flex:1;" />
+              <input id="bulkTransferCaseNumber" name="caseNumber" autocomplete="on" placeholder="CASE-2026-014" style="flex:1;" />
               <button class="btn-secondary" onclick="findCaseEvidenceForTransfer(this)">Find Evidence</button>
             </div>
             <div id="bulkTransferList" style="margin-top:14px;"></div>
@@ -597,12 +595,12 @@
 
           <div class="field-wrap" style="margin-top:12px;">
             <label>Recipient Wallet Address (0x...)</label>
-            <input id="bulkTransferNewHolder" placeholder="0x..." />
+            <input id="bulkTransferNewHolder" name="recipientWallet" autocomplete="on" placeholder="0x..." />
           </div>
 
           <div class="field-wrap">
             <label>Transfer Reason / Custody Note</label>
-            <input id="bulkTransferNote" placeholder="Handed over to Forensic Lab specialist for physical analysis" />
+            <input id="bulkTransferNote" name="transferNote" autocomplete="on" placeholder="Handed over to Forensic Lab specialist for physical analysis" />
           </div>
 
           <button class="btn-primary btn-block" id="bulkTransferBtn" style="display:none; margin-top:14px;" onclick="bulkTransferCustody(this)">Execute Custody Transfer On-Chain</button>

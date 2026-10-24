@@ -1616,6 +1616,29 @@ function switchWorkspacePanel(panelId, title, eyebrow, btnId) {
     loadAdminPendingCounter();
   } else if (panelId === "panel-admin-apikeys") {
     loadAdminApiKeysPanel();
+  } else if (panelId === "panel-forensics-submit") {
+    const labInput = document.getElementById("forensicLabName");
+    const examinerInput = document.getElementById("forensicExaminerName");
+    if (labInput && !labInput.value && (currentOfficerProfile?.departmentData?.labId || currentOfficerProfile?.departmentData?.policeStation)) {
+      labInput.value = currentOfficerProfile.departmentData.labId || currentOfficerProfile.departmentData.policeStation;
+    }
+    if (examinerInput && !examinerInput.value && currentOfficerProfile?.officerName) {
+      examinerInput.value = currentOfficerProfile.officerName;
+    }
+  } else if (panelId === "panel-court-generate") {
+    const courtInput = document.getElementById("courtNameInput");
+    const judgeInput = document.getElementById("courtJudgeNameInput");
+    if (courtInput && !courtInput.value && (currentOfficerProfile?.departmentData?.courtName || currentOfficerProfile?.departmentData?.policeStation)) {
+      courtInput.value = currentOfficerProfile.departmentData.courtName || currentOfficerProfile.departmentData.policeStation;
+    }
+    if (judgeInput && !judgeInput.value && currentOfficerProfile?.officerName) {
+      judgeInput.value = currentOfficerProfile.officerName;
+    }
+  } else if (panelId === "panel-police-register") {
+    const stationInput = document.getElementById("regPoliceStation");
+    if (stationInput && !stationInput.value && currentOfficerProfile?.departmentData?.policeStation) {
+      stationInput.value = currentOfficerProfile.departmentData.policeStation;
+    }
   }
 }
 
