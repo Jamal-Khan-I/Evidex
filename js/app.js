@@ -6525,14 +6525,32 @@ async function openAdminRequestsModal() {
         ? `<span class="badge-status-rejected">REJECTED</span>`
         : `<span class="badge-status-pending">PENDING</span>`;
 
+      const deleteBtn = `
+        <button type="button" class="btn-delete-app" onclick="deleteOfficerApplication(${r.id}, '${(r.officerName || 'Officer').replace(/'/g, "\\'")}')" title="Delete Application" style="display:inline-flex; align-items:center; gap:5px; background:#fff1f2; border:1px solid #fecdd3; border-radius:7px; padding:6px 10px; color:#e11d48; font-size:11.5px; font-weight:600; cursor:pointer; transition:all 0.2s ease;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            <line x1="10" y1="11" x2="10" y2="17"/>
+            <line x1="14" y1="11" x2="14" y2="17"/>
+          </svg>
+          Delete
+        </button>
+      `;
+
       const actions = r.status === 'PENDING'
         ? `
-          <div style="display:flex; gap:8px;">
-            <button class="btn-primary" style="padding: 8px 16px; font-size:12px; background:#166534;" onclick="handleAdminDecision(${r.id}, 'APPROVE')">Approve Access</button>
-            <button class="btn-secondary" style="padding: 8px 14px; font-size:12px; color:#b91c1c;" onclick="handleAdminDecision(${r.id}, 'REJECT')">Deny</button>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button class="btn-primary" style="padding: 7px 14px; font-size:12px; background:#166534;" onclick="handleAdminDecision(${r.id}, 'APPROVE')">Approve Access</button>
+            <button class="btn-secondary" style="padding: 7px 12px; font-size:12px; color:#b91c1c;" onclick="handleAdminDecision(${r.id}, 'REJECT')">Deny</button>
+            ${deleteBtn}
           </div>
         `
-        : `<div style="font-size:11.5px; color:#64748b;">Reviewed ${r.reviewedAt || ''}</div>`;
+        : `
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div style="font-size:11.5px; color:#64748b;">Reviewed ${r.reviewedAt || ''}</div>
+            ${deleteBtn}
+          </div>
+        `;
 
       html += `
         <div class="admin-req-card">
@@ -6587,4 +6605,45 @@ async function handleAdminDecision(requestId, decision) {
   } catch (err) {
     alert("Error executing decision: " + err.message);
   }
+}
+
+async function deleteOfficerApplication(requestId, officerName) {
+  if (!confirm(`Are you sure you want to delete the access application for "${officerName}"? This will permanently remove the record.`)) {
+    return;
+  }
+
+  try {
+    const res = await window.epsApi.deleteAdminRequest(requestId);
+    if (res && res.success) {
+      await openAdminRequestsModal();
+      loadAdminPendingCounter();
+    } else {
+      alert("Failed to delete application: " + (res?.error || "Unknown error"));
+    }
+  } catch (err) {
+    alert("Error deleting application: " + err.message);
+  }
+}
+
+function resetOfficerRegistrationForm() {
+  const fieldIds = [
+    "regOfficerName", "regDob", "regAge", "regMobile", "regEmail",
+    "regWalletAddress", "regOfficerPoliceStation", "regDistrict",
+    "regBadgeNumber", "regLabId", "regAccreditationNumber", "regCourtName"
+  ];
+  fieldIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+  const walletMsg = document.getElementById("regWalletValidationMsg");
+  if (walletMsg) walletMsg.innerHTML = "";
+  retakePassportPhoto();
+  verifiedAadhaarData = null;
+  const checklist = document.getElementById("regAadhaarChecklist");
+  if (checklist) checklist.style.display = "none";
+  const dropzoneInfo = document.getElementById("regAadhaarDropzoneInfo");
+  if (dropzoneInfo) dropzoneInfo.style.display = "block";
+  const statusNotice = document.getElementById("regStatusNotice");
+  if (statusNotice) statusNotice.innerText = "";
+  validateRegistrationForm();
 }

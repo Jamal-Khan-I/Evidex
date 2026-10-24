@@ -324,6 +324,44 @@ router.post('/admin/decision', async (req, res, next) => {
   }
 });
 
+// DELETE /api/auth/admin/requests/:id - Delete an officer application (Admin)
+router.delete('/admin/requests/:id', (req, res, next) => {
+  try {
+    const requestId = req.params.id;
+    const request = db.get('SELECT * FROM officer_registration_requests WHERE id = ?', [requestId]);
+    if (!request) {
+      return res.status(404).json({ success: false, error: 'Registration request not found.' });
+    }
+
+    // Delete from requests table
+    db.run('DELETE FROM officer_registration_requests WHERE id = ?', [requestId]);
+
+    // If not a protected seed account, also remove from officer_profiles so user can re-apply cleanly
+    const protectedWallets = [
+      '0x21815a6006830098c1af1e8f1c2ce7793589ceea',
+      '0x40386f4ec88bf501a562d4552ef9ff6eadfa69da',
+      '0x49ce35ef0dd62ad68072b5eb1a44007e2cb999e6',
+      '0x1093aa4d7ff9eadfbbf2acff370d1bd5daff902d'
+    ];
+    if (request.wallet_address && !protectedWallets.includes(request.wallet_address.toLowerCase())) {
+      db.run('DELETE FROM officer_profiles WHERE LOWER(wallet_address) = ?', [request.wallet_address.toLowerCase()]);
+    }
+
+    // Audit log
+    db.run(
+      'INSERT INTO audit_logs (action, wallet_address, details) VALUES (?, ?, ?)',
+      ['OFFICER_REQUEST_DELETED', request.wallet_address, JSON.stringify({ requestId, officerName: request.officer_name, role: request.role })]
+    );
+
+    res.json({
+      success: true,
+      message: `Application for ${request.officer_name} successfully deleted.`
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // PUT /api/auth/profile/update - Officer self-updates their contact or departmental information
 router.put('/profile/update', (req, res, next) => {
   try {

@@ -172,6 +172,18 @@
       }
     },
 
+    // Delete an officer application (Admin)
+    async deleteAdminRequest(requestId) {
+      try {
+        const res = await fetch(`${API_BASE}/auth/admin/requests/${requestId}`, {
+          method: 'DELETE'
+        });
+        return await res.json();
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+    },
+
     // Officer self-updates contact or departmental profile
     async updateOfficerProfile(payload) {
       try {

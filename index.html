@@ -769,7 +769,13 @@
         <h3>Evidex Officer Identity Registration</h3>
         <p>Tamil Nadu Police Forensic Ledger &middot; Biometric &amp; Cryptographic Credential Onboarding</p>
       </div>
-      <button class="modal-close-btn" onclick="closeRegisterModal()" title="Close">&times;</button>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <button type="button" class="btn-clear-reg-form" onclick="resetOfficerRegistrationForm()" title="Clear all fields" style="background:#fff1f2; border:1px solid #fecdd3; border-radius:8px; padding:6px 12px; color:#e11d48; font-size:12px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:5px; transition:all 0.2s ease;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+          Clear Form
+        </button>
+        <button class="modal-close-btn" onclick="closeRegisterModal()" title="Close">&times;</button>
+      </div>
     </div>
     <div class="modal-body">
       <div class="reg-split-grid">
@@ -825,7 +831,7 @@
           <div class="form-row-2">
             <div class="reg-field-group">
               <label for="regOfficerName">Full Name (as in Aadhaar)</label>
-              <input id="regOfficerName" placeholder="e.g. R. Senthil Kumar" oninput="validateRegistrationForm()" />
+              <input id="regOfficerName" name="officerName" autocomplete="on" placeholder="e.g. R. Senthil Kumar" oninput="validateRegistrationForm()" />
             </div>
             <div class="reg-field-group">
               <label for="regGender">Gender</label>
@@ -840,7 +846,7 @@
           <div class="form-row-3">
             <div class="reg-field-group">
               <label for="regDob">Date of Birth</label>
-              <input id="regDob" type="text" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY" oninput="handleDobInput(this, event)" onkeydown="handleDobKeydown(this, event)" />
+              <input id="regDob" name="dob" autocomplete="on" type="text" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY" oninput="handleDobInput(this, event)" onkeydown="handleDobKeydown(this, event)" />
             </div>
             <div class="reg-field-group">
               <label for="regAge">Age <span class="opt">(Auto-calculated)</span></label>
@@ -848,14 +854,14 @@
             </div>
             <div class="reg-field-group">
               <label for="regMobile">Mobile Number</label>
-              <input id="regMobile" type="tel" maxlength="10" placeholder="9876543210" oninput="validateRegistrationForm()" />
+              <input id="regMobile" name="mobile" autocomplete="on" type="tel" maxlength="10" placeholder="9876543210" oninput="validateRegistrationForm()" />
             </div>
           </div>
 
           <div class="form-row-2">
             <div class="reg-field-group">
               <label for="regEmail">Official Email Address</label>
-              <input id="regEmail" type="email" placeholder="officer@tnpolice.gov.in" oninput="validateRegistrationForm()" />
+              <input id="regEmail" name="email" autocomplete="on" type="email" placeholder="officer@tnpolice.gov.in" oninput="validateRegistrationForm()" />
             </div>
             <div class="reg-field-group">
               <label for="regRole">Service Role Designation</label>
@@ -875,7 +881,7 @@
                 Auto-fill from MetaMask
               </button>
             </label>
-            <input id="regWalletAddress" placeholder="Paste your 42-character Ethereum address (e.g. 0xAbC123...)" oninput="validateWalletAddressInput(this.value)" style="font-family: var(--font-mono); font-size: 12.5px;" />
+            <input id="regWalletAddress" name="walletAddress" autocomplete="on" placeholder="Paste your 42-character Ethereum address (e.g. 0xAbC123...)" oninput="validateWalletAddressInput(this.value)" style="font-family: var(--font-mono); font-size: 12.5px;" />
             <div id="regWalletValidationMsg" style="font-size: 11.5px; margin-top: 2px;"></div>
           </div>
 
@@ -885,17 +891,17 @@
             <div class="form-row-2">
               <div class="reg-field-group">
                 <label for="regOfficerPoliceStation">Police Station Name &amp; Code</label>
-                <input id="regOfficerPoliceStation" placeholder="e.g. Chennai Central — B1 North Beach PS" oninput="validateRegistrationForm()" />
+                <input id="regOfficerPoliceStation" name="policeStation" autocomplete="on" placeholder="e.g. Chennai Central — B1 North Beach PS" oninput="validateRegistrationForm()" />
               </div>
               <div class="reg-field-group">
                 <label for="regDistrict">District / Commissionerate</label>
-                <input id="regDistrict" placeholder="e.g. Greater Chennai Police" oninput="validateRegistrationForm()" />
+                <input id="regDistrict" name="district" autocomplete="on" placeholder="e.g. Greater Chennai Police" oninput="validateRegistrationForm()" />
               </div>
             </div>
             <div class="form-row-2" style="margin-top: 10px;">
               <div class="reg-field-group">
                 <label for="regBadgeNumber">Badge / Constabulary Number</label>
-                <input id="regBadgeNumber" placeholder="e.g. TNP-4482" oninput="validateRegistrationForm()" />
+                <input id="regBadgeNumber" name="badgeNumber" autocomplete="on" placeholder="e.g. TNP-4482" oninput="validateRegistrationForm()" />
               </div>
               <div class="reg-field-group">
                 <label for="regRank">Rank / Designation</label>
@@ -916,11 +922,11 @@
             <div class="form-row-2">
               <div class="reg-field-group">
                 <label for="regLabId">Forensic Lab Name &amp; ID</label>
-                <input id="regLabId" placeholder="e.g. Forensic Sciences Dept, Mylapore — FSL-09" oninput="validateRegistrationForm()" />
+                <input id="regLabId" name="labId" autocomplete="on" placeholder="e.g. Forensic Sciences Dept, Mylapore — FSL-09" oninput="validateRegistrationForm()" />
               </div>
               <div class="reg-field-group">
                 <label for="regAccreditationNumber">NABL / State Accreditation No</label>
-                <input id="regAccreditationNumber" placeholder="e.g. NABL-TC-8812" oninput="validateRegistrationForm()" />
+                <input id="regAccreditationNumber" name="accreditationNumber" autocomplete="on" placeholder="e.g. NABL-TC-8812" oninput="validateRegistrationForm()" />
               </div>
             </div>
             <div class="reg-field-group" style="margin-top: 10px;">
@@ -941,7 +947,7 @@
             <div class="form-row-2">
               <div class="reg-field-group">
                 <label for="regCourtName">Court Complex &amp; Jurisdiction</label>
-                <input id="regCourtName" placeholder="e.g. Principal Sessions Court, Chennai" oninput="validateRegistrationForm()" />
+                <input id="regCourtName" name="courtName" autocomplete="on" placeholder="e.g. Principal Sessions Court, Chennai" oninput="validateRegistrationForm()" />
               </div>
               <div class="reg-field-group">
                 <label for="regCourtDesignation">Designation</label>
