@@ -717,62 +717,119 @@
             <span id="adminApiKeySaveNotice" style="font-size: 12.5px; font-weight: 600; margin-left: 8px;"></span>
           </div>
 
-          <!-- Email Dispatcher (SMTP / Gmail Service) Section -->
+          <!-- Email Dispatcher (Resend HTTP API / SMTP / Brevo) Section -->
           <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-top: 24px;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
               <label style="font-size: 13.5px; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 18px;">✉️</span> Official Email Dispatcher (SMTP &amp; Gmail Service)
+                <span style="font-size: 18px;">✉️</span> Official Email Dispatcher
                 <span id="smtpActiveBadge" style="font-size: 11px; font-weight: 700; border-radius: 10px; padding: 2px 9px; display: inline-flex; align-items: center; gap: 4px; background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; transition: all 0.2s ease;">Not Configured</span>
               </label>
-              <div style="display: flex; gap: 6px;">
-                <button type="button" class="btn-secondary" onclick="applyEmailPreset('gmail')" style="padding: 4px 10px; font-size: 11px; font-weight: 600;">Gmail Preset</button>
-                <button type="button" class="btn-secondary" onclick="applyEmailPreset('brevo')" style="padding: 4px 10px; font-size: 11px; font-weight: 600;">Brevo Preset</button>
-                <button type="button" class="btn-secondary" onclick="applyEmailPreset('custom')" style="padding: 4px 10px; font-size: 11px; font-weight: 600;">Custom SMTP</button>
-              </div>
             </div>
             <p style="font-size: 12.5px; color: #64748b; margin-bottom: 14px; line-height: 1.5;">
               Automatically dispatches real, official notification emails with formal Tamil Nadu Police branding to applicants upon approval or rejection.
             </p>
 
-            <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; font-size: 12px; color: #1e40af; line-height: 1.5;">
-              💡 <strong>Gmail Quick Setup:</strong> Enter your Gmail address, and generate a 16-character <strong>Google App Password</strong> (Google Account &rarr; Security &rarr; 2-Step Verification &rarr; App Passwords). Standard account passwords will be blocked by Google.
+            <!-- Engine Selector Tabs -->
+            <div style="display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; flex-wrap: wrap;">
+              <button type="button" id="tabBtnResend" class="btn-secondary" onclick="switchEmailEngineTab('resend')" style="background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-weight: 700; font-size: 12px; padding: 7px 14px; border-radius: 6px; cursor: pointer;">
+                ⚡ Resend HTTP API (Recommended for Render · Port 443)
+              </button>
+              <button type="button" id="tabBtnSmtp" class="btn-secondary" onclick="switchEmailEngineTab('smtp')" style="font-size: 12px; padding: 7px 14px; border-radius: 6px; cursor: pointer;">
+                Gmail / Custom SMTP (Port 465/587)
+              </button>
+              <button type="button" id="tabBtnBrevo" class="btn-secondary" onclick="switchEmailEngineTab('brevo')" style="font-size: 12px; padding: 7px 14px; border-radius: 6px; cursor: pointer;">
+                Brevo HTTP API (Port 443)
+              </button>
             </div>
 
-            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
-              <div class="field-wrap" style="margin-bottom: 0;">
-                <label style="font-size: 12px; font-weight: 600; color: #475569;">SMTP Host</label>
-                <input type="text" id="adminSmtpHost" placeholder="smtp.gmail.com" value="smtp.gmail.com" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;" />
-              </div>
-              <div class="field-wrap" style="margin-bottom: 0;">
-                <label style="font-size: 12px; font-weight: 600; color: #475569;">Port</label>
-                <input type="number" id="adminSmtpPort" placeholder="465" value="465" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;" />
-              </div>
-              <div class="field-wrap" style="margin-bottom: 0;">
-                <label style="font-size: 12px; font-weight: 600; color: #475569;">Security</label>
-                <select id="adminSmtpSecure" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; background: #fff;">
-                  <option value="true" selected>SSL / TLS (Port 465)</option>
-                  <option value="false">STARTTLS (Port 587)</option>
-                </select>
-              </div>
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
-              <div class="field-wrap" style="margin-bottom: 0;">
-                <label style="font-size: 12px; font-weight: 600; color: #475569;">Sender Email / Username</label>
-                <input type="email" id="adminSmtpUser" placeholder="officer.dept@gmail.com" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;" />
-              </div>
-              <div class="field-wrap" style="margin-bottom: 0;">
-                <label style="font-size: 12px; font-weight: 600; color: #475569;">App Password / SMTP Password</label>
-                <div style="display: flex; gap: 6px;">
-                  <input type="password" id="adminSmtpPass" placeholder="16-digit Google App Password" style="flex: 1; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-family: monospace; font-size: 13px;" />
-                  <button type="button" class="btn-secondary" onclick="toggleApiKeyVisibility('adminSmtpPass', this)" style="padding: 0 12px; font-size: 12px;">Show</button>
+            <!-- TAB 1: RESEND HTTP API (PORT 443 - NEVER BLOCKED BY RENDER) -->
+            <div id="emailEngineSectionResend">
+              <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px 16px; margin-bottom: 14px; font-size: 12px; color: #1e40af; line-height: 1.6;">
+                <strong>💡 Why Resend on Render?</strong> Render's free tier blocks standard SMTP ports (465 &amp; 587), causing Gmail connections to time out. Resend uses standard HTTPS (Port 443), which is <strong>never blocked</strong>, providing 3,000 free emails/month with instant delivery.
+                <div style="margin-top: 6px;">
+                  <a href="https://resend.com" target="_blank" rel="noreferrer" style="font-weight: 700; color: #2563eb; text-decoration: underline;">
+                    👉 Click here to sign up at Resend.com (1-click with Google) &amp; generate your free API key &rarr;
+                  </a>
                 </div>
               </div>
+
+              <div class="field-wrap" style="margin-bottom: 12px;">
+                <label style="font-size: 12px; font-weight: 600; color: #475569;">Resend API Key (starts with <code>re_...</code>)</label>
+                <div style="display: flex; gap: 6px;">
+                  <input type="password" id="adminResendApiKey" placeholder="re_123456789_..." style="flex: 1; padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-family: monospace; font-size: 13px;" />
+                  <button type="button" class="btn-secondary" onclick="toggleApiKeyVisibility('adminResendApiKey', this)" style="padding: 0 12px; font-size: 12px;">Show</button>
+                </div>
+              </div>
+
+              <div class="field-wrap" style="margin-bottom: 14px;">
+                <label style="font-size: 12px; font-weight: 600; color: #475569;">Sender Display Name (Optional)</label>
+                <input type="text" id="adminResendFrom" placeholder="Evidex Police Authority &lt;onboarding@resend.dev&gt;" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;" />
+                <span style="font-size: 11px; color: #64748b; margin-top: 3px; display: block;">Default is <code>onboarding@resend.dev</code> (delivers to your Resend account email for testing, or any verified custom domain).</span>
+              </div>
             </div>
 
-            <div class="field-wrap" style="margin-bottom: 14px;">
-              <label style="font-size: 12px; font-weight: 600; color: #475569;">Official Sender Display Name</label>
-              <input type="text" id="adminSmtpFrom" placeholder='"Evidex Police Authority" &lt;noreply@evidex.tnpolice.gov.in&gt;' style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;" />
+            <!-- TAB 2: GMAIL / CUSTOM SMTP -->
+            <div id="emailEngineSectionSmtp" style="display: none;">
+              <div style="background: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; padding: 12px 16px; margin-bottom: 14px; font-size: 12px; color: #92400e; line-height: 1.5;">
+                ⚠️ <strong>Render Free Tier Port Block:</strong> Render blocks outbound network connections on ports 465 and 587 on its free tier, which produces <code>Connection timeout</code> when connecting to Gmail. If hosted on Render Free Tier, please use the <strong>Resend HTTP API</strong> tab above.
+              </div>
+
+              <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                <div class="field-wrap" style="margin-bottom: 0;">
+                  <label style="font-size: 12px; font-weight: 600; color: #475569;">SMTP Host</label>
+                  <input type="text" id="adminSmtpHost" placeholder="smtp.gmail.com" value="smtp.gmail.com" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;" />
+                </div>
+                <div class="field-wrap" style="margin-bottom: 0;">
+                  <label style="font-size: 12px; font-weight: 600; color: #475569;">Port</label>
+                  <input type="number" id="adminSmtpPort" placeholder="465" value="465" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;" />
+                </div>
+                <div class="field-wrap" style="margin-bottom: 0;">
+                  <label style="font-size: 12px; font-weight: 600; color: #475569;">Security</label>
+                  <select id="adminSmtpSecure" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; background: #fff;">
+                    <option value="true" selected>SSL / TLS (Port 465)</option>
+                    <option value="false">STARTTLS (Port 587)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                <div class="field-wrap" style="margin-bottom: 0;">
+                  <label style="font-size: 12px; font-weight: 600; color: #475569;">Sender Email / Username</label>
+                  <input type="email" id="adminSmtpUser" placeholder="officer.dept@gmail.com" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;" />
+                </div>
+                <div class="field-wrap" style="margin-bottom: 0;">
+                  <label style="font-size: 12px; font-weight: 600; color: #475569;">App Password / SMTP Password</label>
+                  <div style="display: flex; gap: 6px;">
+                    <input type="password" id="adminSmtpPass" placeholder="16-digit Google App Password" style="flex: 1; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-family: monospace; font-size: 13px;" />
+                    <button type="button" class="btn-secondary" onclick="toggleApiKeyVisibility('adminSmtpPass', this)" style="padding: 0 12px; font-size: 12px;">Show</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="field-wrap" style="margin-bottom: 14px;">
+                <label style="font-size: 12px; font-weight: 600; color: #475569;">Official Sender Display Name</label>
+                <input type="text" id="adminSmtpFrom" placeholder='"Evidex Police Authority" &lt;noreply@evidex.tnpolice.gov.in&gt;' style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;" />
+              </div>
+            </div>
+
+            <!-- TAB 3: BREVO HTTP API -->
+            <div id="emailEngineSectionBrevo" style="display: none;">
+              <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px 16px; margin-bottom: 14px; font-size: 12px; color: #166534; line-height: 1.5;">
+                Brevo (formerly Sendinblue) provides 300 free emails/day via HTTP API (Port 443). Get your API key from your Brevo Dashboard under <strong>SMTP &amp; API &rarr; API Keys</strong>.
+              </div>
+
+              <div class="field-wrap" style="margin-bottom: 12px;">
+                <label style="font-size: 12px; font-weight: 600; color: #475569;">Brevo API Key (starts with <code>xkeysib-...</code>)</label>
+                <div style="display: flex; gap: 6px;">
+                  <input type="password" id="adminBrevoApiKey" placeholder="xkeysib-..." style="flex: 1; padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-family: monospace; font-size: 13px;" />
+                  <button type="button" class="btn-secondary" onclick="toggleApiKeyVisibility('adminBrevoApiKey', this)" style="padding: 0 12px; font-size: 12px;">Show</button>
+                </div>
+              </div>
+
+              <div class="field-wrap" style="margin-bottom: 14px;">
+                <label style="font-size: 12px; font-weight: 600; color: #475569;">Verified Brevo Sender Email</label>
+                <input type="email" id="adminBrevoSender" placeholder="your-registered-email@domain.com" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;" />
+              </div>
             </div>
 
             <!-- Email Action Buttons & Live Test -->

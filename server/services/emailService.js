@@ -1,25 +1,34 @@
-// Evidex - Law Enforcement Email Dispatcher (Node.js / Nodemailer)
+// Evidex - Law Enforcement Email Dispatcher (Node.js / Nodemailer & HTTP REST APIs)
 const nodemailer = require('nodemailer');
 const db = require('../db/database');
 
 let transporter = null;
 
-function getSmtpConfig() {
+function getEmailConfig() {
   try {
     const row = db.get("SELECT value FROM system_settings WHERE key = 'smtp_config'");
     if (row && row.value) {
       const cfg = JSON.parse(row.value);
-      if (cfg && cfg.user && cfg.pass) {
+      if (cfg && (cfg.resendApiKey || (cfg.user && cfg.pass) || cfg.brevoApiKey)) {
         return cfg;
       }
     }
   } catch (e) {
-    console.warn('[EmailService] Notice reading smtp_config from database:', e.message);
+    console.warn('[EmailService] Notice reading email config from database:', e.message);
   }
 
   // Fallback to process.env
+  if (process.env.RESEND_API_KEY) {
+    return {
+      provider: 'resend',
+      resendApiKey: process.env.RESEND_API_KEY,
+      from: process.env.SMTP_FROM || 'Evidex Authority <onboarding@resend.dev>'
+    };
+  }
+
   if (process.env.SMTP_USER && process.env.SMTP_PASS) {
     return {
+      provider: 'smtp',
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port: parseInt(process.env.SMTP_PORT, 10) || 465,
       secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465',
@@ -33,6 +42,8 @@ function getSmtpConfig() {
   return null;
 }
 
+const getSmtpConfig = getEmailConfig;
+
 function clearTransporterCache() {
   transporter = null;
 }
@@ -40,7 +51,7 @@ function clearTransporterCache() {
 async function getTransporter() {
   if (transporter) return transporter;
 
-  const cfg = getSmtpConfig();
+  const cfg = getEmailConfig();
 
   if (cfg && cfg.user && cfg.pass) {
     const cleanPass = cfg.pass.replace(/\s+/g, '');
@@ -49,6 +60,9 @@ async function getTransporter() {
     if (isGmail) {
       transporter = nodemailer.createTransport({
         service: 'gmail',
+        connectionTimeout: 8000,
+        greetingTimeout: 5000,
+        socketTimeout: 8000,
         auth: {
           user: cfg.user,
           pass: cleanPass
@@ -60,6 +74,9 @@ async function getTransporter() {
         host: cfg.host,
         port: parseInt(cfg.port, 10) || (cfg.secure ? 465 : 587),
         secure: Boolean(cfg.secure),
+        connectionTimeout: 8000,
+        greetingTimeout: 5000,
+        socketTimeout: 8000,
         auth: {
           user: cfg.user,
           pass: cleanPass
@@ -73,15 +90,15 @@ async function getTransporter() {
     transporter._isLive = true;
     transporter._configuredUser = cfg.user;
   } else {
-    // Fallback: simulated dispatcher with clear console logging
+    // Fallback: simulated dispatcher
     transporter = {
       _isLive: false,
       sendMail: async (opts) => {
-        console.log('\n╔═════════════════════════ SIMULATED EMAIL DISPATCH (NO SMTP CONFIGURED) ═════════════════════════╗');
+        console.log('\n╔═════════════════════════ SIMULATED EMAIL DISPATCH (NO CREDENTIALS) ═════════════════════════╗');
         console.log(`║ TO:      ${opts.to}`);
         console.log(`║ SUBJECT: ${opts.subject}`);
-        console.log('║ NOTICE:  Live SMTP is not configured in Admin Settings. Email was NOT sent to external inbox.     ║');
-        console.log('╚════════════════════════════════════════════════════════════════════════════════════════════════════╝\n');
+        console.log('║ NOTICE:  Live email dispatcher is not configured in Admin Settings.                         ║');
+        console.log('╚══════════════════════════════════════════════════════════════════════════════════════════════╝\n');
         return { messageId: 'simulated-' + Date.now(), simulated: true };
       }
     };
@@ -91,40 +108,196 @@ async function getTransporter() {
 }
 
 /**
- * Verify SMTP credentials and optionally send a test email
+ * Universal email dispatcher: Resend HTTP API (Port 443), Brevo HTTP API (Port 443), or SMTP
+ */
+async function dispatchEmail({ to, subject, html, text }) {
+  const cfg = getEmailConfig();
+  if (!cfg) {
+    return {
+      success: false,
+      notConfigured: true,
+      error: 'Email dispatcher is not configured. Please configure Resend HTTP API or SMTP in Admin Settings.'
+    };
+  }
+
+  // 1. Resend HTTP API (Port 443 - Recommended for Render Free Tier)
+  const isResend = cfg.provider === 'resend' ||
+                   (cfg.resendApiKey && cfg.resendApiKey.startsWith('re_')) ||
+                   (cfg.pass && cfg.pass.startsWith('re_'));
+
+  if (isResend) {
+    const apiKey = (cfg.resendApiKey || cfg.pass).trim();
+    const from = (cfg.from && cfg.from.trim()) ? cfg.from.trim() : 'Evidex Authority <onboarding@resend.dev>';
+
+    console.log(`[EmailService] Dispatching via Resend HTTP API (Port 443) to: ${to}...`);
+    try {
+      const resp = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from,
+          to: Array.isArray(to) ? to : [to],
+          subject,
+          html,
+          text: text || ''
+        })
+      });
+
+      const data = await resp.json();
+      if (!resp.ok) {
+        const errMsg = (data && (data.message || data.error)) || `Resend API Error (HTTP ${resp.status})`;
+        console.error('[EmailService] Resend API error:', errMsg);
+        return { success: false, error: errMsg };
+      }
+
+      console.log(`[EmailService] Delivered via Resend HTTP API! ID: ${data.id}`);
+      return { success: true, messageId: data.id, provider: 'resend' };
+    } catch (err) {
+      console.error('[EmailService] Resend API fetch failed:', err.message);
+      return { success: false, error: 'Resend API network error: ' + err.message };
+    }
+  }
+
+  // 2. Brevo HTTP API (Port 443 - Works on Render)
+  const isBrevo = cfg.provider === 'brevo' ||
+                  (cfg.brevoApiKey && cfg.brevoApiKey.startsWith('xkeysib-')) ||
+                  (cfg.pass && cfg.pass.startsWith('xkeysib-'));
+
+  if (isBrevo) {
+    const apiKey = (cfg.brevoApiKey || cfg.pass).trim();
+    const senderEmail = (cfg.user && cfg.user.includes('@')) ? cfg.user.trim() : 'noreply@evidex.org';
+    const senderName = 'Evidex Police Authority';
+
+    console.log(`[EmailService] Dispatching via Brevo HTTP API (Port 443) to: ${to}...`);
+    try {
+      const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'api-key': apiKey,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          sender: { name: senderName, email: senderEmail },
+          to: [{ email: to }],
+          subject,
+          htmlContent: html
+        })
+      });
+
+      const data = await resp.json();
+      if (!resp.ok) {
+        const errMsg = (data && (data.message || data.error)) || `Brevo API Error (HTTP ${resp.status})`;
+        console.error('[EmailService] Brevo API error:', errMsg);
+        return { success: false, error: errMsg };
+      }
+
+      console.log(`[EmailService] Delivered via Brevo HTTP API! ID: ${data.messageId}`);
+      return { success: true, messageId: data.messageId, provider: 'brevo' };
+    } catch (err) {
+      console.error('[EmailService] Brevo API fetch failed:', err.message);
+      return { success: false, error: 'Brevo API network error: ' + err.message };
+    }
+  }
+
+  // 3. Standard SMTP (Port 465 / 587)
+  const mailer = await getTransporter();
+  const from = cfg.from || (cfg.user ? `Evidex Police Authority <${cfg.user}>` : '"Evidex Police Authority" <noreply@evidex.tnpolice.gov.in>');
+
+  if (!mailer._isLive) {
+    console.warn(`[EmailService] Dispatch simulated (no live email credentials configured).`);
+    return {
+      success: false,
+      notConfigured: true,
+      error: 'Live email dispatcher is not configured. Please configure Resend HTTP API or SMTP in Admin Settings.'
+    };
+  }
+
+  try {
+    console.log(`[EmailService] Dispatching via SMTP transport to: ${to}...`);
+    const info = await mailer.sendMail({ from, to, subject, html });
+    return { success: true, messageId: info.messageId, provider: 'smtp' };
+  } catch (err) {
+    console.error(`[EmailService] SMTP sendMail failed:`, err.message);
+    if (err.message && (err.message.includes('timeout') || err.message.includes('ETIMEDOUT') || err.code === 'ETIMEDOUT')) {
+      return {
+        success: false,
+        error: 'Connection timeout: Render Free Tier blocks outbound SMTP ports (465/587). Please switch to the "Resend HTTP API" option in Settings, which sends over HTTPS (Port 443) and is never blocked by Render.'
+      };
+    }
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Verify credentials and optionally send a test email
  */
 async function testSmtpConnection(targetEmail) {
-  const cfg = getSmtpConfig();
-  if (!cfg || !cfg.user || !cfg.pass) {
+  const cfg = getEmailConfig();
+  if (!cfg) {
+    throw new Error('No email settings saved in Admin Settings. Please enter and save your configuration first.');
+  }
+
+  const isResend = cfg.provider === 'resend' ||
+                   (cfg.resendApiKey && cfg.resendApiKey.startsWith('re_')) ||
+                   (cfg.pass && cfg.pass.startsWith('re_'));
+  const isBrevo = cfg.provider === 'brevo' ||
+                  (cfg.brevoApiKey && cfg.brevoApiKey.startsWith('xkeysib-')) ||
+                  (cfg.pass && cfg.pass.startsWith('xkeysib-'));
+
+  if (isResend || isBrevo) {
+    const engineName = isResend ? 'Resend HTTP API (Port 443 / HTTPS)' : 'Brevo HTTP API (Port 443 / HTTPS)';
+    const result = await dispatchEmail({
+      to: targetEmail,
+      subject: '[TEST] Evidex Official Email Dispatcher Verified',
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 10px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+          <div style="background: linear-gradient(135deg, #090d16 0%, #1e293b 100%); padding: 24px; color: #ffffff; border-bottom: 3px solid #38bdf8;">
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #38bdf8; margin-bottom: 6px;">Tamil Nadu Police &middot; Evidex System</div>
+            <h2 style="margin: 0; font-size: 19px; color: #ffffff;">Email Dispatcher Test Connection Verified</h2>
+          </div>
+          <div style="padding: 24px; color: #1e293b; font-size: 14px; line-height: 1.6;">
+            <p style="margin: 0 0 16px 0;">This official test dispatch confirms that your <strong>Evidex Email Dispatcher</strong> is properly connected via <strong>${engineName}</strong> and successfully sending live emails without port blocking or timeouts.</p>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 16px; font-size: 13px;">
+              <div><strong>Engine:</strong> ${engineName}</div>
+              <div><strong>Recipient:</strong> ${targetEmail}</div>
+              <div><strong>Verification Time:</strong> ${new Date().toUTCString()}</div>
+            </div>
+            <p style="font-size: 13px; color: #64748b; margin: 0;">Officer access approval and rejection notices will now be delivered automatically to their inboxes.</p>
+          </div>
+          <div style="background: #f1f5f9; padding: 14px 24px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0;">
+            Evidex Forensic Evidence Protection System &middot; Confidential Automated Notification
+          </div>
+        </div>
+      `
+    });
+
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to dispatch test email via HTTP API.');
+    }
+    return { success: true, messageId: result.messageId, recipient: targetEmail, provider: isResend ? 'resend' : 'brevo' };
+  }
+
+  // Otherwise, standard SMTP
+  const mailer = await getTransporter();
+  if (!mailer._isLive) {
     throw new Error('SMTP credentials are not saved in Admin Settings. Please enter and save your Email and App Password first.');
   }
 
-  let mailer;
-  const cleanPass = cfg.pass.replace(/\s+/g, '');
-  const isGmail = (cfg.service === 'gmail') || (cfg.host && cfg.host.includes('gmail.com'));
-
-  if (isGmail) {
-    mailer = nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user: cfg.user, pass: cleanPass }
-    });
-  } else {
-    mailer = nodemailer.createTransport({
-      host: cfg.host,
-      port: parseInt(cfg.port, 10) || (cfg.secure ? 465 : 587),
-      secure: Boolean(cfg.secure),
-      auth: { user: cfg.user, pass: cleanPass },
-      tls: { rejectUnauthorized: false }
-    });
+  try {
+    await mailer.verify();
+  } catch (err) {
+    if (err.message && (err.message.includes('timeout') || err.message.includes('ETIMEDOUT') || err.code === 'ETIMEDOUT')) {
+      throw new Error('Connection timeout: Render Free Tier blocks outbound SMTP ports (465/587). Please switch to the "Resend HTTP API" option in Settings, which sends over HTTPS (Port 443) without any timeouts.');
+    }
+    throw err;
   }
 
-  // Verify connection with mail server
-  await mailer.verify();
-
   if (targetEmail) {
-    const from = cfg.from || `Evidex Police Authority <${cfg.user}>`;
-    const info = await mailer.sendMail({
-      from,
+    const res = await dispatchEmail({
       to: targetEmail,
       subject: '[TEST] Evidex Official Email Dispatcher Verified',
       html: `
@@ -137,7 +310,7 @@ async function testSmtpConnection(targetEmail) {
             <p style="margin: 0 0 16px 0;">This official test dispatch confirms that your <strong>Evidex Email Dispatcher</strong> is properly connected and delivering live emails.</p>
             <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 16px; font-size: 13px;">
               <div><strong>Sender Account:</strong> ${cfg.user}</div>
-              <div><strong>Dispatcher Mode:</strong> ${isGmail ? 'Google Mail Service (SSL 465)' : cfg.host + ':' + cfg.port}</div>
+              <div><strong>Recipient:</strong> ${targetEmail}</div>
               <div><strong>Verification Time:</strong> ${new Date().toUTCString()}</div>
             </div>
             <p style="font-size: 13px; color: #64748b; margin: 0;">Applicant approval and rejection notices will now be delivered automatically to officers' inboxes.</p>
@@ -148,7 +321,8 @@ async function testSmtpConnection(targetEmail) {
         </div>
       `
     });
-    return { success: true, messageId: info.messageId, recipient: targetEmail };
+    if (!res.success) throw new Error(res.error);
+    return res;
   }
 
   return { success: true, verified: true };
@@ -163,9 +337,6 @@ async function sendApprovalEmail(officer) {
     return { success: false, error: 'Officer does not have an email address specified.' };
   }
 
-  const mailer = await getTransporter();
-  const cfg = getSmtpConfig();
-  const from = (cfg && cfg.from) || (cfg && cfg.user ? `Evidex Police Authority <${cfg.user}>` : (process.env.SMTP_FROM || '"Evidex Police Authority" <noreply@evidex.tnpolice.gov.in>'));
   const portalUrl = process.env.APP_URL || 'https://evidex-1gj7.onrender.com';
 
   const roleTitle = officer.role === 'POLICE'
@@ -292,31 +463,11 @@ async function sendApprovalEmail(officer) {
 </html>
   `;
 
-  try {
-    console.log(`[EmailService] Attempting to dispatch approval email to: ${officer.email}...`);
-    const info = await mailer.sendMail({
-      from,
-      to: officer.email,
-      subject: `[OFFICIAL] Evidex Access Approved — ${officer.officer_name} (${roleTitle})`,
-      html
-    });
-
-    if (info.simulated || !mailer._isLive) {
-      console.warn(`[EmailService] Approval email was simulated (live SMTP not configured).`);
-      return {
-        success: false,
-        notConfigured: true,
-        messageId: info.messageId,
-        error: 'Email dispatcher is not configured with live SMTP/Gmail credentials. Please configure Gmail/SMTP in Admin Settings.'
-      };
-    }
-
-    console.log(`[EmailService] Approval email delivered successfully to ${officer.email} (MessageId: ${info.messageId})`);
-    return { success: true, messageId: info.messageId };
-  } catch (err) {
-    console.error(`[EmailService] Failed to send approval email to ${officer.email}:`, err.message);
-    return { success: false, error: err.message };
-  }
+  return await dispatchEmail({
+    to: officer.email,
+    subject: `[OFFICIAL] Evidex Access Approved — ${officer.officer_name} (${roleTitle})`,
+    html
+  });
 }
 
 /**
@@ -328,9 +479,6 @@ async function sendRejectionEmail(officer, reason) {
     return { success: false, error: 'Officer does not have an email address specified.' };
   }
 
-  const mailer = await getTransporter();
-  const cfg = getSmtpConfig();
-  const from = (cfg && cfg.from) || (cfg && cfg.user ? `Evidex Police Authority <${cfg.user}>` : (process.env.SMTP_FROM || '"Evidex Police Authority" <noreply@evidex.tnpolice.gov.in>'));
   const portalUrl = process.env.APP_URL || 'https://evidex-1gj7.onrender.com';
 
   const html = `
@@ -392,37 +540,19 @@ async function sendRejectionEmail(officer, reason) {
 </html>
   `;
 
-  try {
-    console.log(`[EmailService] Attempting to dispatch rejection email to: ${officer.email}...`);
-    const info = await mailer.sendMail({
-      from,
-      to: officer.email,
-      subject: `[NOTICE] Evidex Access Application Status — ${officer.officer_name}`,
-      html
-    });
-
-    if (info.simulated || !mailer._isLive) {
-      console.warn(`[EmailService] Rejection email was simulated (live SMTP not configured).`);
-      return {
-        success: false,
-        notConfigured: true,
-        messageId: info.messageId,
-        error: 'Email dispatcher is not configured with live SMTP/Gmail credentials. Please configure Gmail/SMTP in Admin Settings.'
-      };
-    }
-
-    console.log(`[EmailService] Rejection email delivered successfully to ${officer.email} (MessageId: ${info.messageId})`);
-    return { success: true, messageId: info.messageId };
-  } catch (err) {
-    console.error(`[EmailService] Failed to send rejection email to ${officer.email}:`, err.message);
-    return { success: false, error: err.message };
-  }
+  return await dispatchEmail({
+    to: officer.email,
+    subject: `[NOTICE] Evidex Access Application Status — ${officer.officer_name}`,
+    html
+  });
 }
 
 module.exports = {
   sendApprovalEmail,
   sendRejectionEmail,
+  getEmailConfig,
   getSmtpConfig,
   clearTransporterCache,
-  testSmtpConnection
+  testSmtpConnection,
+  dispatchEmail
 };

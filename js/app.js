@@ -2624,41 +2624,40 @@ async function testAdminApiKey() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// ADMIN EMAIL DISPATCHER (SMTP / GMAIL SERVICE)
+// ADMIN EMAIL DISPATCHER (RESEND HTTP API / SMTP / BREVO)
 // ═══════════════════════════════════════════════════════════════════
 
-function applyEmailPreset(preset) {
-  const host = document.getElementById("adminSmtpHost");
-  const port = document.getElementById("adminSmtpPort");
-  const secure = document.getElementById("adminSmtpSecure");
-  const user = document.getElementById("adminSmtpUser");
-  const from = document.getElementById("adminSmtpFrom");
+let currentEmailEngine = 'resend';
 
-  if (preset === 'gmail') {
-    if (host) host.value = "smtp.gmail.com";
-    if (port) port.value = "465";
-    if (secure) secure.value = "true";
-    if (user && !user.value) user.placeholder = "your.email@gmail.com";
-    if (from && (!from.value || from.value.includes('evidex.tnpolice.gov.in'))) {
-      from.value = '"Evidex Police Authority" <noreply@gmail.com>';
-    }
-  } else if (preset === 'brevo') {
-    if (host) host.value = "smtp-relay.brevo.com";
-    if (port) port.value = "587";
-    if (secure) secure.value = "false";
-    if (user && !user.value) user.placeholder = "your-brevo-login@domain.com";
-  } else if (preset === 'custom') {
-    if (host) host.value = "";
-    if (port) port.value = "587";
-    if (secure) secure.value = "false";
-  }
+function switchEmailEngineTab(engine) {
+  currentEmailEngine = engine;
+
+  const secResend = document.getElementById("emailEngineSectionResend");
+  const secSmtp = document.getElementById("emailEngineSectionSmtp");
+  const secBrevo = document.getElementById("emailEngineSectionBrevo");
+
+  const btnResend = document.getElementById("tabBtnResend");
+  const btnSmtp = document.getElementById("tabBtnSmtp");
+  const btnBrevo = document.getElementById("tabBtnBrevo");
+
+  if (secResend) secResend.style.display = engine === 'resend' ? 'block' : 'none';
+  if (secSmtp) secSmtp.style.display = engine === 'smtp' ? 'block' : 'none';
+  if (secBrevo) secBrevo.style.display = engine === 'brevo' ? 'block' : 'none';
+
+  const activeCss = "background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-weight:700;";
+  const inactiveCss = "background:#ffffff; color:#475569; border:1px solid #cbd5e1; font-weight:500;";
+
+  if (btnResend) btnResend.style.cssText = `font-size:12px; padding:7px 14px; border-radius:6px; cursor:pointer; ${engine === 'resend' ? activeCss : inactiveCss}`;
+  if (btnSmtp) btnSmtp.style.cssText = `font-size:12px; padding:7px 14px; border-radius:6px; cursor:pointer; ${engine === 'smtp' ? activeCss : inactiveCss}`;
+  if (btnBrevo) btnBrevo.style.cssText = `font-size:12px; padding:7px 14px; border-radius:6px; cursor:pointer; ${engine === 'brevo' ? activeCss : inactiveCss}`;
 }
 
-function updateSmtpBadge(isConfigured, userEmail = '') {
+function updateSmtpBadge(isConfigured, providerOrUser = '') {
   const badge = document.getElementById("smtpActiveBadge");
   if (!badge) return;
   if (isConfigured) {
-    badge.textContent = userEmail ? `Active (${userEmail})` : "Active";
+    const label = providerOrUser ? `Active (${providerOrUser})` : "Active";
+    badge.textContent = label;
     badge.style.background = "#dcfce7";
     badge.style.color = "#15803d";
     badge.style.border = "1px solid #86efac";
@@ -2671,73 +2670,98 @@ function updateSmtpBadge(isConfigured, userEmail = '') {
 }
 
 async function loadAdminEmailConfig() {
+  const resendKeyEl = document.getElementById("adminResendApiKey");
+  const resendFromEl = document.getElementById("adminResendFrom");
+
   const hostEl = document.getElementById("adminSmtpHost");
   const portEl = document.getElementById("adminSmtpPort");
   const secureEl = document.getElementById("adminSmtpSecure");
   const userEl = document.getElementById("adminSmtpUser");
   const passEl = document.getElementById("adminSmtpPass");
   const fromEl = document.getElementById("adminSmtpFrom");
+
+  const brevoKeyEl = document.getElementById("adminBrevoApiKey");
+  const brevoSenderEl = document.getElementById("adminBrevoSender");
+
   const testRecipEl = document.getElementById("adminTestRecipientEmail");
 
   try {
     const res = await window.epsApi.getEmailConfig();
     if (res && res.success && res.config) {
       const c = res.config;
+      const initialEngine = c.provider || (c.hasResend ? 'resend' : (c.hasBrevo ? 'brevo' : 'resend'));
+      switchEmailEngineTab(initialEngine);
+
+      if (resendKeyEl && c.hasResend) resendKeyEl.value = c.resendApiKeyMasked || "••••••••";
+      if (resendFromEl) resendFromEl.value = c.from || "";
+
       if (hostEl) hostEl.value = c.host || "smtp.gmail.com";
       if (portEl) portEl.value = c.port || "465";
       if (secureEl) secureEl.value = c.secure ? "true" : "false";
       if (userEl) userEl.value = c.user || "";
       if (passEl && c.hasPass) passEl.value = c.passMasked || "••••••••";
       if (fromEl) fromEl.value = c.from || "";
+
+      if (brevoKeyEl && c.hasBrevo) brevoKeyEl.value = c.brevoApiKeyMasked || "••••••••";
+      if (brevoSenderEl) brevoSenderEl.value = c.user || "";
+
       if (testRecipEl && !testRecipEl.value && c.user) testRecipEl.value = c.user;
 
-      updateSmtpBadge(Boolean(c.user && c.hasPass), c.user);
+      const providerLabel = initialEngine === 'resend' ? 'Resend API' : (initialEngine === 'brevo' ? 'Brevo API' : (c.user || 'SMTP'));
+      updateSmtpBadge(c.hasConfig, providerLabel);
     } else {
+      switchEmailEngineTab('resend');
       updateSmtpBadge(false);
     }
   } catch (err) {
     console.warn("Failed to load email config:", err);
+    switchEmailEngineTab('resend');
     updateSmtpBadge(false);
   }
 }
 
 async function saveAdminEmailConfig() {
+  const notice = document.getElementById("adminEmailSaveNotice");
+  if (notice) {
+    notice.style.color = "#0284c7";
+    notice.textContent = "Saving email configuration...";
+  }
+
+  const resendApiKey = (document.getElementById("adminResendApiKey")?.value || "").trim();
+  const resendFrom = (document.getElementById("adminResendFrom")?.value || "").trim();
+
   const host = (document.getElementById("adminSmtpHost")?.value || "").trim();
   const port = (document.getElementById("adminSmtpPort")?.value || "").trim();
   const secure = document.getElementById("adminSmtpSecure")?.value === "true";
   const user = (document.getElementById("adminSmtpUser")?.value || "").trim();
   const pass = (document.getElementById("adminSmtpPass")?.value || "").trim();
   const from = (document.getElementById("adminSmtpFrom")?.value || "").trim();
-  const notice = document.getElementById("adminEmailSaveNotice");
 
-  if (!user) {
-    alert("Please enter a Sender Email / Username.");
-    return;
-  }
+  const brevoApiKey = (document.getElementById("adminBrevoApiKey")?.value || "").trim();
+  const brevoSender = (document.getElementById("adminBrevoSender")?.value || "").trim();
 
-  if (notice) {
-    notice.style.color = "#0284c7";
-    notice.textContent = "Saving email configuration...";
-  }
+  const payload = {
+    provider: currentEmailEngine,
+    resendApiKey,
+    from: currentEmailEngine === 'resend' ? resendFrom : (currentEmailEngine === 'smtp' ? from : ''),
+    brevoApiKey,
+    host: host || "smtp.gmail.com",
+    port: port || "465",
+    secure,
+    user: currentEmailEngine === 'brevo' ? brevoSender : user,
+    pass,
+    service: (host === "smtp.gmail.com" || user.endsWith("@gmail.com")) ? "gmail" : ""
+  };
 
   try {
-    const service = (host === "smtp.gmail.com" || user.endsWith("@gmail.com")) ? "gmail" : "";
-    const res = await window.epsApi.saveEmailConfig({
-      host: host || "smtp.gmail.com",
-      port: port || "465",
-      secure,
-      user,
-      pass,
-      from,
-      service
-    });
-
+    const res = await window.epsApi.saveEmailConfig(payload);
     if (res && res.success) {
       if (notice) {
         notice.style.color = "#16a34a";
-        notice.textContent = "✓ Email dispatcher saved! Use 'Send Test Email' to verify delivery.";
+        notice.textContent = "✓ Settings saved! Click 'Send Test Email' to verify delivery.";
       }
-      updateSmtpBadge(res.hasConfig, user);
+      const label = currentEmailEngine === 'resend' ? 'Resend API' : (currentEmailEngine === 'brevo' ? 'Brevo API' : (user || 'SMTP'));
+      updateSmtpBadge(res.hasConfig, label);
     } else {
       if (notice) {
         notice.style.color = "#dc2626";
@@ -2753,17 +2777,19 @@ async function saveAdminEmailConfig() {
 }
 
 async function testAdminEmailConfig() {
-  const recipient = (document.getElementById("adminTestRecipientEmail")?.value || document.getElementById("adminSmtpUser")?.value || "").trim();
+  const recipient = (document.getElementById("adminTestRecipientEmail")?.value || 
+                     document.getElementById("adminSmtpUser")?.value || 
+                     document.getElementById("adminBrevoSender")?.value || "").trim();
   const notice = document.getElementById("adminEmailSaveNotice");
 
   if (!recipient || !recipient.includes("@")) {
-    alert("Please enter a valid recipient email address in the test input field to receive the test email.");
+    alert("Please enter a valid recipient email address in the test input field.");
     return;
   }
 
   if (notice) {
     notice.style.color = "#0284c7";
-    notice.textContent = `Connecting to SMTP server & sending test email to ${recipient}...`;
+    notice.textContent = `Connecting & sending test email to ${recipient}...`;
   }
 
   try {
@@ -2779,14 +2805,14 @@ async function testAdminEmailConfig() {
         notice.style.color = "#dc2626";
         notice.textContent = `Connection error: ${res?.error || "Unknown error"}`;
       }
-      alert("SMTP Verification Failed:\n\n" + (res?.error || "Unknown error") + "\n\nTip: For Gmail, ensure you use a 16-character App Password, NOT your normal Google password.");
+      alert("Email Dispatcher Verification Failed:\n\n" + (res?.error || "Unknown error"));
     }
   } catch (err) {
     if (notice) {
       notice.style.color = "#dc2626";
       notice.textContent = "Error: " + err.message;
     }
-    alert("Network or connection error testing email: " + err.message);
+    alert("Error testing email dispatcher:\n\n" + err.message);
   }
 }
 

@@ -112,15 +112,22 @@ router.post('/admin/api-keys', (req, res) => {
   }
 });
 
-// ── ADMIN EMAIL DISPATCHER CONFIGURATION (SMTP / GMAIL) ──
+// ── ADMIN EMAIL DISPATCHER CONFIGURATION (RESEND HTTP API / BREVO / SMTP) ──
 router.get('/admin/email-config', (req, res) => {
   try {
     const row = db.get("SELECT value FROM system_settings WHERE key = 'smtp_config'");
     let cfg = {};
     if (row && row.value) {
       try { cfg = JSON.parse(row.value); } catch (e) {}
+    } else if (process.env.RESEND_API_KEY) {
+      cfg = {
+        provider: 'resend',
+        resendApiKey: process.env.RESEND_API_KEY,
+        from: process.env.SMTP_FROM || 'Evidex Authority <onboarding@resend.dev>'
+      };
     } else if (process.env.SMTP_USER) {
       cfg = {
+        provider: 'smtp',
         host: process.env.SMTP_HOST || 'smtp.gmail.com',
         port: process.env.SMTP_PORT || '465',
         secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465',
@@ -131,18 +138,27 @@ router.get('/admin/email-config', (req, res) => {
       };
     }
 
+    const hasResend = Boolean(cfg.resendApiKey || (cfg.pass && cfg.pass.startsWith('re_')));
+    const hasBrevo = Boolean(cfg.brevoApiKey || (cfg.pass && cfg.pass.startsWith('xkeysib-')));
     const hasPass = Boolean(cfg.pass);
+
     res.json({
       success: true,
       config: {
+        provider: cfg.provider || (hasResend ? 'resend' : (hasBrevo ? 'brevo' : 'resend')),
+        resendApiKeyMasked: hasResend ? '••••••••' : '',
+        brevoApiKeyMasked: hasBrevo ? '••••••••' : '',
         host: cfg.host || 'smtp.gmail.com',
         port: cfg.port || '465',
         secure: cfg.secure !== undefined ? Boolean(cfg.secure) : true,
         user: cfg.user || '',
         from: cfg.from || '',
         service: cfg.service || 'gmail',
-        hasPass: hasPass,
-        passMasked: hasPass ? '••••••••' : ''
+        hasResend,
+        hasBrevo,
+        hasPass,
+        passMasked: hasPass ? '••••••••' : '',
+        hasConfig: hasResend || hasBrevo || Boolean(cfg.user && cfg.pass)
       }
     });
   } catch (err) {
@@ -152,7 +168,7 @@ router.get('/admin/email-config', (req, res) => {
 
 router.post('/admin/email-config', (req, res) => {
   try {
-    const { host, port, secure, user, pass, from, service } = req.body;
+    const { provider, resendApiKey, brevoApiKey, host, port, secure, user, pass, from, service } = req.body;
 
     // Retrieve previous config to preserve existing password if masked
     const row = db.get("SELECT value FROM system_settings WHERE key = 'smtp_config'");
@@ -166,7 +182,22 @@ router.post('/admin/email-config', (req, res) => {
       effectivePass = prevCfg.pass || '';
     }
 
+    let effectiveResendKey = (resendApiKey || '').trim();
+    if (!effectiveResendKey || effectiveResendKey === '••••••••') {
+      effectiveResendKey = prevCfg.resendApiKey || (prevCfg.pass && prevCfg.pass.startsWith('re_') ? prevCfg.pass : '');
+    }
+
+    let effectiveBrevoKey = (brevoApiKey || '').trim();
+    if (!effectiveBrevoKey || effectiveBrevoKey === '••••••••') {
+      effectiveBrevoKey = prevCfg.brevoApiKey || (prevCfg.pass && prevCfg.pass.startsWith('xkeysib-') ? prevCfg.pass : '');
+    }
+
+    const selectedProvider = provider || (effectiveResendKey ? 'resend' : (effectiveBrevoKey ? 'brevo' : 'smtp'));
+
     const newCfg = {
+      provider: selectedProvider,
+      resendApiKey: effectiveResendKey,
+      brevoApiKey: effectiveBrevoKey,
       host: (host || 'smtp.gmail.com').trim(),
       port: (port || '465').toString().trim(),
       secure: secure !== undefined ? Boolean(secure) : true,
@@ -185,10 +216,13 @@ router.post('/admin/email-config', (req, res) => {
     // Refresh emailService transporter cache
     emailService.clearTransporterCache();
 
+    const hasConfig = Boolean(effectiveResendKey || effectiveBrevoKey || (newCfg.user && newCfg.pass));
+
     res.json({
       success: true,
       message: 'Email dispatcher settings saved successfully.',
-      hasConfig: Boolean(newCfg.user && newCfg.pass)
+      provider: selectedProvider,
+      hasConfig
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
