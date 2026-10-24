@@ -72,6 +72,8 @@ router.use('/profile', profileRoutes);
 router.use('/auth', authRoutes);
 router.use('/cases', casesRoutes);
 
+const emailService = require('../services/emailService');
+
 // ── ADMIN API KEYS CONFIGURATION (GROQ AI ENGINE) ──
 router.get('/admin/api-keys', (req, res) => {
   try {
@@ -107,6 +109,110 @@ router.post('/admin/api-keys', (req, res) => {
     res.json({ success: true, message: 'Groq API key saved successfully.' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── ADMIN EMAIL DISPATCHER CONFIGURATION (SMTP / GMAIL) ──
+router.get('/admin/email-config', (req, res) => {
+  try {
+    const row = db.get("SELECT value FROM system_settings WHERE key = 'smtp_config'");
+    let cfg = {};
+    if (row && row.value) {
+      try { cfg = JSON.parse(row.value); } catch (e) {}
+    } else if (process.env.SMTP_USER) {
+      cfg = {
+        host: process.env.SMTP_HOST || 'smtp.gmail.com',
+        port: process.env.SMTP_PORT || '465',
+        secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465',
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+        from: process.env.SMTP_FROM || '',
+        service: process.env.SMTP_SERVICE || ''
+      };
+    }
+
+    const hasPass = Boolean(cfg.pass);
+    res.json({
+      success: true,
+      config: {
+        host: cfg.host || 'smtp.gmail.com',
+        port: cfg.port || '465',
+        secure: cfg.secure !== undefined ? Boolean(cfg.secure) : true,
+        user: cfg.user || '',
+        from: cfg.from || '',
+        service: cfg.service || 'gmail',
+        hasPass: hasPass,
+        passMasked: hasPass ? '••••••••' : ''
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/admin/email-config', (req, res) => {
+  try {
+    const { host, port, secure, user, pass, from, service } = req.body;
+
+    // Retrieve previous config to preserve existing password if masked
+    const row = db.get("SELECT value FROM system_settings WHERE key = 'smtp_config'");
+    let prevCfg = {};
+    if (row && row.value) {
+      try { prevCfg = JSON.parse(row.value); } catch (e) {}
+    }
+
+    let effectivePass = (pass || '').trim();
+    if (!effectivePass || effectivePass === '••••••••') {
+      effectivePass = prevCfg.pass || '';
+    }
+
+    const newCfg = {
+      host: (host || 'smtp.gmail.com').trim(),
+      port: (port || '465').toString().trim(),
+      secure: secure !== undefined ? Boolean(secure) : true,
+      user: (user || '').trim(),
+      pass: effectivePass,
+      from: (from || '').trim(),
+      service: (service || '').trim()
+    };
+
+    const now = new Date().toISOString();
+    db.run(
+      "INSERT OR REPLACE INTO system_settings (key, value, updated_at) VALUES ('smtp_config', ?, ?)",
+      [JSON.stringify(newCfg), now]
+    );
+
+    // Refresh emailService transporter cache
+    emailService.clearTransporterCache();
+
+    res.json({
+      success: true,
+      message: 'Email dispatcher settings saved successfully.',
+      hasConfig: Boolean(newCfg.user && newCfg.pass)
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/admin/test-email', async (req, res) => {
+  try {
+    const { targetEmail } = req.body;
+    if (!targetEmail || !targetEmail.includes('@')) {
+      return res.status(400).json({ success: false, error: 'Please enter a valid recipient email address for testing.' });
+    }
+
+    const result = await emailService.testSmtpConnection(targetEmail.trim());
+    res.json({
+      success: true,
+      message: `Test email successfully dispatched to ${targetEmail}! Please check your inbox (and spam/junk folder).`,
+      result
+    });
+  } catch (err) {
+    res.status(400).json({
+      success: false,
+      error: err.message || 'SMTP connection failed. Check host, port, username and App Password.'
+    });
   }
 });
 

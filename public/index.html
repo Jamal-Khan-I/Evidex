@@ -716,6 +716,81 @@
             </button>
             <span id="adminApiKeySaveNotice" style="font-size: 12.5px; font-weight: 600; margin-left: 8px;"></span>
           </div>
+
+          <!-- Email Dispatcher (SMTP / Gmail Service) Section -->
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-top: 24px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <label style="font-size: 13.5px; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 18px;">✉️</span> Official Email Dispatcher (SMTP &amp; Gmail Service)
+                <span id="smtpActiveBadge" style="font-size: 11px; font-weight: 700; border-radius: 10px; padding: 2px 9px; display: inline-flex; align-items: center; gap: 4px; background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; transition: all 0.2s ease;">Not Configured</span>
+              </label>
+              <div style="display: flex; gap: 6px;">
+                <button type="button" class="btn-secondary" onclick="applyEmailPreset('gmail')" style="padding: 4px 10px; font-size: 11px; font-weight: 600;">Gmail Preset</button>
+                <button type="button" class="btn-secondary" onclick="applyEmailPreset('brevo')" style="padding: 4px 10px; font-size: 11px; font-weight: 600;">Brevo Preset</button>
+                <button type="button" class="btn-secondary" onclick="applyEmailPreset('custom')" style="padding: 4px 10px; font-size: 11px; font-weight: 600;">Custom SMTP</button>
+              </div>
+            </div>
+            <p style="font-size: 12.5px; color: #64748b; margin-bottom: 14px; line-height: 1.5;">
+              Automatically dispatches real, official notification emails with formal Tamil Nadu Police branding to applicants upon approval or rejection.
+            </p>
+
+            <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; font-size: 12px; color: #1e40af; line-height: 1.5;">
+              💡 <strong>Gmail Quick Setup:</strong> Enter your Gmail address, and generate a 16-character <strong>Google App Password</strong> (Google Account &rarr; Security &rarr; 2-Step Verification &rarr; App Passwords). Standard account passwords will be blocked by Google.
+            </div>
+
+            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+              <div class="field-wrap" style="margin-bottom: 0;">
+                <label style="font-size: 12px; font-weight: 600; color: #475569;">SMTP Host</label>
+                <input type="text" id="adminSmtpHost" placeholder="smtp.gmail.com" value="smtp.gmail.com" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;" />
+              </div>
+              <div class="field-wrap" style="margin-bottom: 0;">
+                <label style="font-size: 12px; font-weight: 600; color: #475569;">Port</label>
+                <input type="number" id="adminSmtpPort" placeholder="465" value="465" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;" />
+              </div>
+              <div class="field-wrap" style="margin-bottom: 0;">
+                <label style="font-size: 12px; font-weight: 600; color: #475569;">Security</label>
+                <select id="adminSmtpSecure" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; background: #fff;">
+                  <option value="true" selected>SSL / TLS (Port 465)</option>
+                  <option value="false">STARTTLS (Port 587)</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+              <div class="field-wrap" style="margin-bottom: 0;">
+                <label style="font-size: 12px; font-weight: 600; color: #475569;">Sender Email / Username</label>
+                <input type="email" id="adminSmtpUser" placeholder="officer.dept@gmail.com" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;" />
+              </div>
+              <div class="field-wrap" style="margin-bottom: 0;">
+                <label style="font-size: 12px; font-weight: 600; color: #475569;">App Password / SMTP Password</label>
+                <div style="display: flex; gap: 6px;">
+                  <input type="password" id="adminSmtpPass" placeholder="16-digit Google App Password" style="flex: 1; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-family: monospace; font-size: 13px;" />
+                  <button type="button" class="btn-secondary" onclick="toggleApiKeyVisibility('adminSmtpPass', this)" style="padding: 0 12px; font-size: 12px;">Show</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="field-wrap" style="margin-bottom: 14px;">
+              <label style="font-size: 12px; font-weight: 600; color: #475569;">Official Sender Display Name</label>
+              <input type="text" id="adminSmtpFrom" placeholder='"Evidex Police Authority" &lt;noreply@evidex.tnpolice.gov.in&gt;' style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;" />
+            </div>
+
+            <!-- Email Action Buttons & Live Test -->
+            <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 14px;">
+              <button type="button" class="btn-primary" onclick="saveAdminEmailConfig()" style="background: #0284c7; color: #ffffff; padding: 9px 20px; border-radius: 8px; font-weight: 700; cursor: pointer;">
+                Save Email Dispatcher
+              </button>
+              
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="email" id="adminTestRecipientEmail" placeholder="test-recipient@gmail.com" style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12.5px; width: 220px;" />
+                <button type="button" class="btn-secondary" onclick="testAdminEmailConfig()" style="padding: 8px 14px; border-radius: 6px; font-weight: 600; font-size: 12.5px; cursor: pointer;">
+                  Send Test Email
+                </button>
+              </div>
+
+              <span id="adminEmailSaveNotice" style="font-size: 12.5px; font-weight: 600; margin-left: 8px;"></span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1135,6 +1210,10 @@
       <button class="modal-close-btn" onclick="closeAdminRequestsModal()" title="Close">&times;</button>
     </div>
     <div class="modal-body">
+      <div id="adminEmailNoticeBanner" style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:10px 14px; margin-bottom:14px; font-size:12.5px; color:#1e40af; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+        <span>✉️ <strong>Official Email Dispatch:</strong> Officers automatically receive formal notification upon approval or rejection.</span>
+        <button type="button" class="btn-secondary" style="padding:4px 10px; font-size:11.5px;" onclick="closeAdminRequestsModal(); switchWorkspacePanel('panel-admin-apikeys', 'AI Intelligence &amp; Email Dispatcher Settings', 'State Administration · System Settings', 'nav-admin-apikeys');">Configure Dispatcher</button>
+      </div>
       <div id="adminRequestsListContainer">
         <div style="text-align:center; padding: 30px; color:#64748b;">Loading pending requests...</div>
       </div>

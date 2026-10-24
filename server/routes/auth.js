@@ -286,10 +286,14 @@ router.post('/admin/decision', async (req, res, next) => {
         ['OFFICER_APPROVED', request.wallet_address, JSON.stringify({ officerName: request.officer_name, role: request.role, email: request.email })]
       );
 
+      const emailMsg = emailResult.success
+        ? `Official confirmation email sent to ${request.email}.`
+        : `Notice: Email could not reach external inbox (${emailResult.error || 'SMTP not configured'}). Set up Gmail/SMTP in Admin Settings to deliver emails.`;
+
       return res.json({
         success: true,
         status: 'APPROVED',
-        message: `Officer ${request.officer_name} successfully approved. Official confirmation email sent to ${request.email}.`,
+        message: `Officer ${request.officer_name} successfully approved. ${emailMsg}`,
         emailResult
       });
     } else {
@@ -309,13 +313,17 @@ router.post('/admin/decision', async (req, res, next) => {
       // Audit log
       db.run(
         'INSERT INTO audit_logs (action, wallet_address, details) VALUES (?, ?, ?)',
-        ['OFFICER_REJECTED', request.wallet_address, JSON.stringify({ officerName: request.officer_name, reason: rejectReason })]
+        ['OFFICER_REJECTED', request.wallet_address, JSON.stringify({ officerName: request.officer_name, reason: rejectReason, email: request.email, emailResult })]
       );
+
+      const emailMsg = emailResult.success
+        ? `Formal notification email sent to ${request.email}.`
+        : `Notice: Email could not reach external inbox (${emailResult.error || 'SMTP not configured'}). Set up Gmail/SMTP in Admin Settings to deliver emails.`;
 
       return res.json({
         success: true,
         status: 'REJECTED',
-        message: `Officer access request denied. Formal notification email sent to ${request.email}.`,
+        message: `Officer access request denied. ${emailMsg}`,
         emailResult
       });
     }

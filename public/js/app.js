@@ -1567,10 +1567,10 @@ function renderRoleSidebar(role) {
       },
       {
         id: "nav-admin-apikeys",
-        label: "API Keys",
+        label: "Settings & Keys",
         panelId: "panel-admin-apikeys",
-        title: "AI Intelligence & API Configuration",
-        eyebrow: "State Administration · Intelligence Engine Keys",
+        title: "AI Intelligence & Email Dispatcher Settings",
+        eyebrow: "State Administration · System & Email Settings",
         icon: `<svg viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>`
       }
     ];
@@ -2442,6 +2442,9 @@ async function loadAdminApiKeysPanel() {
   const notice = document.getElementById("adminApiKeySaveNotice");
   if (notice) notice.innerHTML = "";
 
+  // Also load Email Dispatcher settings in Panel 13
+  loadAdminEmailConfig();
+
   if (groqInput && !groqInput.dataset.boundListener) {
     groqInput.dataset.boundListener = "true";
     groqInput.addEventListener("input", () => {
@@ -2617,6 +2620,173 @@ async function testAdminApiKey() {
       notice.style.color = "#dc2626";
       notice.textContent = "Test error: " + err.message;
     }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ADMIN EMAIL DISPATCHER (SMTP / GMAIL SERVICE)
+// ═══════════════════════════════════════════════════════════════════
+
+function applyEmailPreset(preset) {
+  const host = document.getElementById("adminSmtpHost");
+  const port = document.getElementById("adminSmtpPort");
+  const secure = document.getElementById("adminSmtpSecure");
+  const user = document.getElementById("adminSmtpUser");
+  const from = document.getElementById("adminSmtpFrom");
+
+  if (preset === 'gmail') {
+    if (host) host.value = "smtp.gmail.com";
+    if (port) port.value = "465";
+    if (secure) secure.value = "true";
+    if (user && !user.value) user.placeholder = "your.email@gmail.com";
+    if (from && (!from.value || from.value.includes('evidex.tnpolice.gov.in'))) {
+      from.value = '"Evidex Police Authority" <noreply@gmail.com>';
+    }
+  } else if (preset === 'brevo') {
+    if (host) host.value = "smtp-relay.brevo.com";
+    if (port) port.value = "587";
+    if (secure) secure.value = "false";
+    if (user && !user.value) user.placeholder = "your-brevo-login@domain.com";
+  } else if (preset === 'custom') {
+    if (host) host.value = "";
+    if (port) port.value = "587";
+    if (secure) secure.value = "false";
+  }
+}
+
+function updateSmtpBadge(isConfigured, userEmail = '') {
+  const badge = document.getElementById("smtpActiveBadge");
+  if (!badge) return;
+  if (isConfigured) {
+    badge.textContent = userEmail ? `Active (${userEmail})` : "Active";
+    badge.style.background = "#dcfce7";
+    badge.style.color = "#15803d";
+    badge.style.border = "1px solid #86efac";
+  } else {
+    badge.textContent = "Not Configured";
+    badge.style.background = "#fee2e2";
+    badge.style.color = "#b91c1c";
+    badge.style.border = "1px solid #fca5a5";
+  }
+}
+
+async function loadAdminEmailConfig() {
+  const hostEl = document.getElementById("adminSmtpHost");
+  const portEl = document.getElementById("adminSmtpPort");
+  const secureEl = document.getElementById("adminSmtpSecure");
+  const userEl = document.getElementById("adminSmtpUser");
+  const passEl = document.getElementById("adminSmtpPass");
+  const fromEl = document.getElementById("adminSmtpFrom");
+  const testRecipEl = document.getElementById("adminTestRecipientEmail");
+
+  try {
+    const res = await window.epsApi.getEmailConfig();
+    if (res && res.success && res.config) {
+      const c = res.config;
+      if (hostEl) hostEl.value = c.host || "smtp.gmail.com";
+      if (portEl) portEl.value = c.port || "465";
+      if (secureEl) secureEl.value = c.secure ? "true" : "false";
+      if (userEl) userEl.value = c.user || "";
+      if (passEl && c.hasPass) passEl.value = c.passMasked || "••••••••";
+      if (fromEl) fromEl.value = c.from || "";
+      if (testRecipEl && !testRecipEl.value && c.user) testRecipEl.value = c.user;
+
+      updateSmtpBadge(Boolean(c.user && c.hasPass), c.user);
+    } else {
+      updateSmtpBadge(false);
+    }
+  } catch (err) {
+    console.warn("Failed to load email config:", err);
+    updateSmtpBadge(false);
+  }
+}
+
+async function saveAdminEmailConfig() {
+  const host = (document.getElementById("adminSmtpHost")?.value || "").trim();
+  const port = (document.getElementById("adminSmtpPort")?.value || "").trim();
+  const secure = document.getElementById("adminSmtpSecure")?.value === "true";
+  const user = (document.getElementById("adminSmtpUser")?.value || "").trim();
+  const pass = (document.getElementById("adminSmtpPass")?.value || "").trim();
+  const from = (document.getElementById("adminSmtpFrom")?.value || "").trim();
+  const notice = document.getElementById("adminEmailSaveNotice");
+
+  if (!user) {
+    alert("Please enter a Sender Email / Username.");
+    return;
+  }
+
+  if (notice) {
+    notice.style.color = "#0284c7";
+    notice.textContent = "Saving email configuration...";
+  }
+
+  try {
+    const service = (host === "smtp.gmail.com" || user.endsWith("@gmail.com")) ? "gmail" : "";
+    const res = await window.epsApi.saveEmailConfig({
+      host: host || "smtp.gmail.com",
+      port: port || "465",
+      secure,
+      user,
+      pass,
+      from,
+      service
+    });
+
+    if (res && res.success) {
+      if (notice) {
+        notice.style.color = "#16a34a";
+        notice.textContent = "✓ Email dispatcher saved! Use 'Send Test Email' to verify delivery.";
+      }
+      updateSmtpBadge(res.hasConfig, user);
+    } else {
+      if (notice) {
+        notice.style.color = "#dc2626";
+        notice.textContent = "Save failed: " + (res?.error || "Unknown error");
+      }
+    }
+  } catch (err) {
+    if (notice) {
+      notice.style.color = "#dc2626";
+      notice.textContent = "Error saving settings: " + err.message;
+    }
+  }
+}
+
+async function testAdminEmailConfig() {
+  const recipient = (document.getElementById("adminTestRecipientEmail")?.value || document.getElementById("adminSmtpUser")?.value || "").trim();
+  const notice = document.getElementById("adminEmailSaveNotice");
+
+  if (!recipient || !recipient.includes("@")) {
+    alert("Please enter a valid recipient email address in the test input field to receive the test email.");
+    return;
+  }
+
+  if (notice) {
+    notice.style.color = "#0284c7";
+    notice.textContent = `Connecting to SMTP server & sending test email to ${recipient}...`;
+  }
+
+  try {
+    const res = await window.epsApi.testEmailConfig(recipient);
+    if (res && res.success) {
+      if (notice) {
+        notice.style.color = "#16a34a";
+        notice.textContent = `✓ Test email delivered! Check inbox for ${recipient}`;
+      }
+      alert(res.message);
+    } else {
+      if (notice) {
+        notice.style.color = "#dc2626";
+        notice.textContent = `Connection error: ${res?.error || "Unknown error"}`;
+      }
+      alert("SMTP Verification Failed:\n\n" + (res?.error || "Unknown error") + "\n\nTip: For Gmail, ensure you use a 16-character App Password, NOT your normal Google password.");
+    }
+  } catch (err) {
+    if (notice) {
+      notice.style.color = "#dc2626";
+      notice.textContent = "Error: " + err.message;
+    }
+    alert("Network or connection error testing email: " + err.message);
   }
 }
 
@@ -6587,11 +6757,10 @@ function closeAdminRequestsModal() {
 }
 
 async function handleAdminDecision(requestId, decision) {
-  let reason = '';
-  if (decision === 'REJECT') {
-    reason = prompt("Please enter the reason for rejection (will be included in the email to the applicant):");
-    if (!reason) return;
-  }
+  // Execute immediately without prompting for a reason
+  const reason = decision === 'REJECT'
+    ? 'Departmental credentials or Aadhaar verification failed to meet validation thresholds.'
+    : '';
 
   try {
     const res = await window.epsApi.submitAdminDecision(requestId, decision, reason);

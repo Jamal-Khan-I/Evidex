@@ -1,60 +1,171 @@
 // Evidex - Law Enforcement Email Dispatcher (Node.js / Nodemailer)
 const nodemailer = require('nodemailer');
+const db = require('../db/database');
 
 let transporter = null;
+
+function getSmtpConfig() {
+  try {
+    const row = db.get("SELECT value FROM system_settings WHERE key = 'smtp_config'");
+    if (row && row.value) {
+      const cfg = JSON.parse(row.value);
+      if (cfg && cfg.user && cfg.pass) {
+        return cfg;
+      }
+    }
+  } catch (e) {
+    console.warn('[EmailService] Notice reading smtp_config from database:', e.message);
+  }
+
+  // Fallback to process.env
+  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+    return {
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.SMTP_PORT, 10) || 465,
+      secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465',
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+      from: process.env.SMTP_FROM || `Evidex Police Authority <${process.env.SMTP_USER}>`,
+      service: process.env.SMTP_SERVICE || ''
+    };
+  }
+
+  return null;
+}
+
+function clearTransporterCache() {
+  transporter = null;
+}
 
 async function getTransporter() {
   if (transporter) return transporter;
 
-  const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+  const cfg = getSmtpConfig();
 
-  if (host && user && pass) {
-    transporter = nodemailer.createTransport({
-      host: host,
-      port: parseInt(process.env.SMTP_PORT, 10) || 587,
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: { user, pass }
-    });
-    console.log(`[EmailService] Configured live SMTP transport for host: ${host}`);
-  } else {
-    // Development / fallback: Create Ethereal test account or local logger
-    try {
-      const testAccount = await nodemailer.createTestAccount();
+  if (cfg && cfg.user && cfg.pass) {
+    const cleanPass = cfg.pass.replace(/\s+/g, '');
+    const isGmail = (cfg.service === 'gmail') || (cfg.host && cfg.host.includes('gmail.com'));
+
+    if (isGmail) {
       transporter = nodemailer.createTransport({
-        host: 'smtp.ethereal.email',
-        port: 587,
-        secure: false,
+        service: 'gmail',
         auth: {
-          user: testAccount.user,
-          pass: testAccount.pass
+          user: cfg.user,
+          pass: cleanPass
         }
       });
-      console.log(`[EmailService] Development Ethereal SMTP active (User: ${testAccount.user})`);
-    } catch (e) {
-      // Offline fallback
-      transporter = {
-        sendMail: async (opts) => {
-          console.log('\n╔═════════════════════════ SIMULATED EMAIL DISPATCH ═════════════════════════╗');
-          console.log(`║ TO:      ${opts.to}`);
-          console.log(`║ SUBJECT: ${opts.subject}`);
-          console.log('╚════════════════════════════════════════════════════════════════════════════╝\n');
-          return { messageId: 'simulated-' + Date.now() };
+      console.log(`[EmailService] Live Gmail SMTP active for account: ${cfg.user}`);
+    } else {
+      transporter = nodemailer.createTransport({
+        host: cfg.host,
+        port: parseInt(cfg.port, 10) || (cfg.secure ? 465 : 587),
+        secure: Boolean(cfg.secure),
+        auth: {
+          user: cfg.user,
+          pass: cleanPass
+        },
+        tls: {
+          rejectUnauthorized: false
         }
-      };
+      });
+      console.log(`[EmailService] Live SMTP transport active for host: ${cfg.host}:${cfg.port}`);
     }
+    transporter._isLive = true;
+    transporter._configuredUser = cfg.user;
+  } else {
+    // Fallback: simulated dispatcher with clear console logging
+    transporter = {
+      _isLive: false,
+      sendMail: async (opts) => {
+        console.log('\n╔═════════════════════════ SIMULATED EMAIL DISPATCH (NO SMTP CONFIGURED) ═════════════════════════╗');
+        console.log(`║ TO:      ${opts.to}`);
+        console.log(`║ SUBJECT: ${opts.subject}`);
+        console.log('║ NOTICE:  Live SMTP is not configured in Admin Settings. Email was NOT sent to external inbox.     ║');
+        console.log('╚════════════════════════════════════════════════════════════════════════════════════════════════════╝\n');
+        return { messageId: 'simulated-' + Date.now(), simulated: true };
+      }
+    };
   }
 
   return transporter;
 }
 
 /**
+ * Verify SMTP credentials and optionally send a test email
+ */
+async function testSmtpConnection(targetEmail) {
+  const cfg = getSmtpConfig();
+  if (!cfg || !cfg.user || !cfg.pass) {
+    throw new Error('SMTP credentials are not saved in Admin Settings. Please enter and save your Email and App Password first.');
+  }
+
+  let mailer;
+  const cleanPass = cfg.pass.replace(/\s+/g, '');
+  const isGmail = (cfg.service === 'gmail') || (cfg.host && cfg.host.includes('gmail.com'));
+
+  if (isGmail) {
+    mailer = nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user: cfg.user, pass: cleanPass }
+    });
+  } else {
+    mailer = nodemailer.createTransport({
+      host: cfg.host,
+      port: parseInt(cfg.port, 10) || (cfg.secure ? 465 : 587),
+      secure: Boolean(cfg.secure),
+      auth: { user: cfg.user, pass: cleanPass },
+      tls: { rejectUnauthorized: false }
+    });
+  }
+
+  // Verify connection with mail server
+  await mailer.verify();
+
+  if (targetEmail) {
+    const from = cfg.from || `Evidex Police Authority <${cfg.user}>`;
+    const info = await mailer.sendMail({
+      from,
+      to: targetEmail,
+      subject: '[TEST] Evidex Official Email Dispatcher Verified',
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 10px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+          <div style="background: linear-gradient(135deg, #090d16 0%, #1e293b 100%); padding: 24px; color: #ffffff; border-bottom: 3px solid #38bdf8;">
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #38bdf8; margin-bottom: 6px;">Tamil Nadu Police &middot; Evidex System</div>
+            <h2 style="margin: 0; font-size: 19px; color: #ffffff;">Email Dispatcher Test Connection Verified</h2>
+          </div>
+          <div style="padding: 24px; color: #1e293b; font-size: 14px; line-height: 1.6;">
+            <p style="margin: 0 0 16px 0;">This official test dispatch confirms that your <strong>Evidex Email Dispatcher</strong> is properly connected and delivering live emails.</p>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 16px; font-size: 13px;">
+              <div><strong>Sender Account:</strong> ${cfg.user}</div>
+              <div><strong>Dispatcher Mode:</strong> ${isGmail ? 'Google Mail Service (SSL 465)' : cfg.host + ':' + cfg.port}</div>
+              <div><strong>Verification Time:</strong> ${new Date().toUTCString()}</div>
+            </div>
+            <p style="font-size: 13px; color: #64748b; margin: 0;">Applicant approval and rejection notices will now be delivered automatically to officers' inboxes.</p>
+          </div>
+          <div style="background: #f1f5f9; padding: 14px 24px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0;">
+            Evidex Forensic Evidence Protection System &middot; Confidential Automated Notification
+          </div>
+        </div>
+      `
+    });
+    return { success: true, messageId: info.messageId, recipient: targetEmail };
+  }
+
+  return { success: true, verified: true };
+}
+
+/**
  * Send an official Approval Email to the officer
  */
 async function sendApprovalEmail(officer) {
+  if (!officer || !officer.email) {
+    console.warn('[EmailService] Cannot send approval email: No recipient email provided.');
+    return { success: false, error: 'Officer does not have an email address specified.' };
+  }
+
   const mailer = await getTransporter();
-  const from = process.env.SMTP_FROM || '"Evidex Police Authority" <noreply@evidex.tnpolice.gov.in>';
+  const cfg = getSmtpConfig();
+  const from = (cfg && cfg.from) || (cfg && cfg.user ? `Evidex Police Authority <${cfg.user}>` : (process.env.SMTP_FROM || '"Evidex Police Authority" <noreply@evidex.tnpolice.gov.in>'));
   const portalUrl = process.env.APP_URL || 'https://evidex-1gj7.onrender.com';
 
   const roleTitle = officer.role === 'POLICE'
@@ -182,6 +293,7 @@ async function sendApprovalEmail(officer) {
   `;
 
   try {
+    console.log(`[EmailService] Attempting to dispatch approval email to: ${officer.email}...`);
     const info = await mailer.sendMail({
       from,
       to: officer.email,
@@ -189,13 +301,20 @@ async function sendApprovalEmail(officer) {
       html
     });
 
-    const previewUrl = nodemailer.getTestMessageUrl ? nodemailer.getTestMessageUrl(info) : null;
-    if (previewUrl) {
-      console.log(`[EmailService] Approval email preview URL: ${previewUrl}`);
+    if (info.simulated || !mailer._isLive) {
+      console.warn(`[EmailService] Approval email was simulated (live SMTP not configured).`);
+      return {
+        success: false,
+        notConfigured: true,
+        messageId: info.messageId,
+        error: 'Email dispatcher is not configured with live SMTP/Gmail credentials. Please configure Gmail/SMTP in Admin Settings.'
+      };
     }
-    return { success: true, messageId: info.messageId, previewUrl };
+
+    console.log(`[EmailService] Approval email delivered successfully to ${officer.email} (MessageId: ${info.messageId})`);
+    return { success: true, messageId: info.messageId };
   } catch (err) {
-    console.error('[EmailService] Failed to send approval email:', err.message);
+    console.error(`[EmailService] Failed to send approval email to ${officer.email}:`, err.message);
     return { success: false, error: err.message };
   }
 }
@@ -204,8 +323,14 @@ async function sendApprovalEmail(officer) {
  * Send a respectful Rejection / Modification Notice Email
  */
 async function sendRejectionEmail(officer, reason) {
+  if (!officer || !officer.email) {
+    console.warn('[EmailService] Cannot send rejection email: No recipient email provided.');
+    return { success: false, error: 'Officer does not have an email address specified.' };
+  }
+
   const mailer = await getTransporter();
-  const from = process.env.SMTP_FROM || '"Evidex Police Authority" <noreply@evidex.tnpolice.gov.in>';
+  const cfg = getSmtpConfig();
+  const from = (cfg && cfg.from) || (cfg && cfg.user ? `Evidex Police Authority <${cfg.user}>` : (process.env.SMTP_FROM || '"Evidex Police Authority" <noreply@evidex.tnpolice.gov.in>'));
   const portalUrl = process.env.APP_URL || 'https://evidex-1gj7.onrender.com';
 
   const html = `
@@ -268,6 +393,7 @@ async function sendRejectionEmail(officer, reason) {
   `;
 
   try {
+    console.log(`[EmailService] Attempting to dispatch rejection email to: ${officer.email}...`);
     const info = await mailer.sendMail({
       from,
       to: officer.email,
@@ -275,15 +401,28 @@ async function sendRejectionEmail(officer, reason) {
       html
     });
 
-    const previewUrl = nodemailer.getTestMessageUrl ? nodemailer.getTestMessageUrl(info) : null;
-    return { success: true, messageId: info.messageId, previewUrl };
+    if (info.simulated || !mailer._isLive) {
+      console.warn(`[EmailService] Rejection email was simulated (live SMTP not configured).`);
+      return {
+        success: false,
+        notConfigured: true,
+        messageId: info.messageId,
+        error: 'Email dispatcher is not configured with live SMTP/Gmail credentials. Please configure Gmail/SMTP in Admin Settings.'
+      };
+    }
+
+    console.log(`[EmailService] Rejection email delivered successfully to ${officer.email} (MessageId: ${info.messageId})`);
+    return { success: true, messageId: info.messageId };
   } catch (err) {
-    console.error('[EmailService] Failed to send rejection email:', err.message);
+    console.error(`[EmailService] Failed to send rejection email to ${officer.email}:`, err.message);
     return { success: false, error: err.message };
   }
 }
 
 module.exports = {
   sendApprovalEmail,
-  sendRejectionEmail
+  sendRejectionEmail,
+  getSmtpConfig,
+  clearTransporterCache,
+  testSmtpConnection
 };

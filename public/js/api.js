@@ -320,6 +320,42 @@
       }
     },
 
+    // Email Dispatcher (SMTP / Gmail) API
+    async getEmailConfig() {
+      try {
+        const res = await fetch(`${API_BASE}/admin/email-config`);
+        return await res.json();
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+    },
+
+    async saveEmailConfig(payload) {
+      try {
+        const res = await fetch(`${API_BASE}/admin/email-config`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        return await res.json();
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+    },
+
+    async testEmailConfig(targetEmail) {
+      try {
+        const res = await fetch(`${API_BASE}/admin/test-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetEmail })
+        });
+        return await res.json();
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+    },
+
     // AI Case Story analysis & generation (Powered by Groq)
     async analyzeCaseStory(caseNumber) {
       try {
