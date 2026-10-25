@@ -138,26 +138,33 @@ router.get('/admin/email-config', (req, res) => {
       };
     }
 
-    const hasResend = Boolean(cfg.resendApiKey || (cfg.pass && cfg.pass.startsWith('re_')));
-    const hasBrevo = Boolean(cfg.brevoApiKey || (cfg.pass && cfg.pass.startsWith('xkeysib-')));
-    const hasPass = Boolean(cfg.pass);
+    const resendKey = cfg.resendApiKey || (cfg.pass && cfg.pass.startsWith('re_') ? cfg.pass : '') || '';
+    const brevoKey = cfg.brevoApiKey || (cfg.pass && cfg.pass.startsWith('xkeysib-') ? cfg.pass : '') || '';
+    const smtpPass = cfg.pass || '';
+
+    const hasResend = Boolean(resendKey);
+    const hasBrevo = Boolean(brevoKey);
+    const hasPass = Boolean(smtpPass);
 
     res.json({
       success: true,
       config: {
         provider: cfg.provider || (hasResend ? 'resend' : (hasBrevo ? 'brevo' : 'resend')),
+        resendApiKey: resendKey,
         resendApiKeyMasked: hasResend ? '••••••••' : '',
+        brevoApiKey: brevoKey,
         brevoApiKeyMasked: hasBrevo ? '••••••••' : '',
         host: cfg.host || 'smtp.gmail.com',
         port: cfg.port || '465',
         secure: cfg.secure !== undefined ? Boolean(cfg.secure) : true,
         user: cfg.user || '',
+        pass: smtpPass,
+        passMasked: hasPass ? '••••••••' : '',
         from: cfg.from || '',
         service: cfg.service || 'gmail',
         hasResend,
         hasBrevo,
         hasPass,
-        passMasked: hasPass ? '••••••••' : '',
         hasConfig: hasResend || hasBrevo || Boolean(cfg.user && cfg.pass)
       }
     });

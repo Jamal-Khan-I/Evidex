@@ -142,6 +142,12 @@ function formatError(err) {
   return "Unknown error — check the browser console for details.";
 }
 
+function shortenHex(hex, start = 6, end = 4) {
+  if (!hex || typeof hex !== 'string') return '';
+  if (hex.length <= start + end) return hex;
+  return `${hex.slice(0, start)}...${hex.slice(-end)}`;
+}
+
 const ROLE_NAMES = ["Unauthorized", "Investigator", "Lab", "Court"];
 
 // Custom roles (ID 4+) are created on-chain by the admin and have no fixed
@@ -2502,10 +2508,26 @@ async function loadAdminApiKeysPanel() {
   }
 }
 
-function toggleApiKeyVisibility(inputId, btn) {
+async function toggleApiKeyVisibility(inputId, btn) {
   const input = document.getElementById(inputId);
   if (!input) return;
   if (input.type === "password") {
+    if (input.value === "••••••••" || input.value.trim() === "••••••••") {
+      try {
+        const res = await window.epsApi.getEmailConfig();
+        if (res && res.success && res.config) {
+          if (inputId === "adminResendApiKey" && res.config.resendApiKey) {
+            input.value = res.config.resendApiKey;
+          } else if (inputId === "adminSmtpPass" && res.config.pass) {
+            input.value = res.config.pass;
+          } else if (inputId === "adminBrevoApiKey" && res.config.brevoApiKey) {
+            input.value = res.config.brevoApiKey;
+          }
+        }
+      } catch (e) {
+        console.warn("Notice unmasking key:", e);
+      }
+    }
     input.type = "text";
     if (btn) btn.textContent = "Hide";
   } else {
@@ -2692,17 +2714,17 @@ async function loadAdminEmailConfig() {
       const initialEngine = c.provider || (c.hasResend ? 'resend' : (c.hasBrevo ? 'brevo' : 'resend'));
       switchEmailEngineTab(initialEngine);
 
-      if (resendKeyEl && c.hasResend) resendKeyEl.value = c.resendApiKeyMasked || "••••••••";
+      if (resendKeyEl) resendKeyEl.value = c.resendApiKey || "";
       if (resendFromEl) resendFromEl.value = c.from || "";
 
       if (hostEl) hostEl.value = c.host || "smtp.gmail.com";
       if (portEl) portEl.value = c.port || "465";
       if (secureEl) secureEl.value = c.secure ? "true" : "false";
       if (userEl) userEl.value = c.user || "";
-      if (passEl && c.hasPass) passEl.value = c.passMasked || "••••••••";
+      if (passEl) passEl.value = c.pass || "";
       if (fromEl) fromEl.value = c.from || "";
 
-      if (brevoKeyEl && c.hasBrevo) brevoKeyEl.value = c.brevoApiKeyMasked || "••••••••";
+      if (brevoKeyEl) brevoKeyEl.value = c.brevoApiKey || "";
       if (brevoSenderEl) brevoSenderEl.value = c.user || "";
 
       if (testRecipEl && !testRecipEl.value && c.user) testRecipEl.value = c.user;
