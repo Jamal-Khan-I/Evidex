@@ -136,30 +136,20 @@ router.post('/', (req, res, next) => {
     const isForensicsReq = forensicsRequested ? 1 : 0;
     const forensicsStatus = isForensicsReq ? 'PENDING' : 'NOT_REQUIRED';
 
-    // Clean out previous records for this case so newly registered evidence cleanly replaces previous ones
+    // If a case with this number already exists, delete the old case and all its records completely
+    // so the new registration replaces it cleanly from scratch without updating or keeping old data
     db.run('DELETE FROM evidence_records WHERE case_number = ?', [caseNumber]);
     db.run('DELETE FROM forensic_reports WHERE case_number = ?', [caseNumber]);
     db.run('DELETE FROM court_reports WHERE case_number = ?', [caseNumber]);
+    db.run('DELETE FROM audit_logs WHERE case_number = ?', [caseNumber]);
+    db.run('DELETE FROM cases WHERE case_number = ?', [caseNumber]);
 
     const nowIso = new Date().toISOString();
 
     db.run(
       `INSERT INTO cases 
        (case_number, fir_number, police_station, law_sections, description, registered_by, officer_name, case_key, forensics_requested, forensics_status, court_status, case_status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 'OPEN', ?)
-       ON CONFLICT(case_number) DO UPDATE SET
-         fir_number = COALESCE(excluded.fir_number, cases.fir_number),
-         police_station = COALESCE(excluded.police_station, cases.police_station),
-         law_sections = COALESCE(excluded.law_sections, cases.law_sections),
-         description = COALESCE(excluded.description, cases.description),
-         registered_by = COALESCE(excluded.registered_by, cases.registered_by),
-         officer_name = COALESCE(excluded.officer_name, cases.officer_name),
-         case_key = COALESCE(excluded.case_key, cases.case_key),
-         forensics_requested = excluded.forensics_requested,
-         forensics_status = CASE 
-           WHEN cases.forensics_status = 'SUBMITTED' THEN 'SUBMITTED'
-           ELSE excluded.forensics_status
-         END`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 'OPEN', ?)`,
       [
         caseNumber,
         firNumber || null,

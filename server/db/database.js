@@ -125,66 +125,58 @@ function initDatabase() {
       const sections = 'BNS Sec 318(4), 316(2), 336(3), 61(2) | IT Act Sec 43, 66C, 66D | BSA Sec 63';
       const desc = 'Transnational Cyber Crime Syndicate Virtual Custody / Digital Arrest extortion racket targeting senior citizens.';
 
-      db.prepare(`
-        INSERT OR IGNORE INTO cases 
-        (case_number, fir_number, police_station, law_sections, description, registered_by, officer_name, case_key, forensics_requested, forensics_status, court_status, case_status, created_at, closed_at) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 'SUBMITTED', 'CLOSED', 'CLOSED', DATETIME('now'), DATETIME('now'))
-      `).run(
-        caseNum,
-        firNum,
-        station,
-        sections,
-        desc,
-        '0x40386f4ec88bf501a562d4552ef9ff6eadfa69da',
-        'Inspector Vikramaditya Rathore',
-        'E7qci6ybOpKWAN7xJJyRoL133lthzj'
-      );
-
-      // If already inserted, ensure status reflects the submitted reports
-      db.prepare(`
-        UPDATE cases 
-        SET forensics_status = 'SUBMITTED', court_status = 'CLOSED', case_status = 'CLOSED', closed_at = COALESCE(closed_at, DATETIME('now'))
-        WHERE case_number = ?
-      `).run(caseNum);
-
-      const crypto = require('crypto');
-      const testDir = path.resolve(__dirname, '../../test_case_files');
-      if (fs.existsSync(testDir)) {
-        const files = fs.readdirSync(testDir);
-        files.forEach((f, idx) => {
-          try {
-            const fPath = path.join(testDir, f);
-            const content = fs.readFileSync(fPath);
-            const hash = '0x' + crypto.createHash('sha256').update(content).digest('hex');
-            const stat = fs.statSync(fPath);
-            const evId = `${caseNum}-EV${String(idx + 1).padStart(2, '0')}`;
-
-            db.prepare(`
-              INSERT OR IGNORE INTO evidence_records 
-              (id, case_number, file_name, file_hash, file_size, mime_type, description, submitter_address, current_custodian, tx_hash, block_number, created_at) 
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME('now'))
-            `).run(
-              evId,
-              caseNum,
-              f,
-              hash,
-              stat.size,
-              f.endsWith('.pdf') ? 'application/pdf' : (f.endsWith('.csv') ? 'text/csv' : 'text/plain'),
-              `Seized Exhibit ${idx + 1}: ${f}`,
-              '0x40386f4ec88bf501a562d4552ef9ff6eadfa69da',
-              '0x40386f4ec88bf501a562d4552ef9ff6eadfa69da',
-              '0x58f79d1a3c749921b0e5672abf8812c3098d667104b998cf1e809314ac618df2',
-              7894561
-            );
-          } catch (fileErr) {}
-        });
-      }
-
-      // Seed official Forensic Lab Report into forensic_reports table
-      const existingFReport = db.prepare('SELECT id FROM forensic_reports WHERE case_number = ?').get(caseNum);
-      if (!existingFReport) {
+      const existingCase = db.prepare('SELECT case_number FROM cases WHERE case_number = ?').get(caseNum);
+      if (!existingCase) {
         db.prepare(`
-          INSERT INTO forensic_reports 
+          INSERT INTO cases 
+          (case_number, fir_number, police_station, law_sections, description, registered_by, officer_name, case_key, forensics_requested, forensics_status, court_status, case_status, created_at, closed_at) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 'SUBMITTED', 'CLOSED', 'CLOSED', DATETIME('now'), DATETIME('now'))
+        `).run(
+          caseNum,
+          firNum,
+          station,
+          sections,
+          desc,
+          '0x40386f4ec88bf501a562d4552ef9ff6eadfa69da',
+          'Inspector Vikramaditya Rathore',
+          'E7qci6ybOpKWAN7xJJyRoL133lthzj'
+        );
+
+        const crypto = require('crypto');
+        const testDir = path.resolve(__dirname, '../../test_case_files');
+        if (fs.existsSync(testDir)) {
+          const files = fs.readdirSync(testDir);
+          files.forEach((f, idx) => {
+            try {
+              const fPath = path.join(testDir, f);
+              const content = fs.readFileSync(fPath);
+              const hash = '0x' + crypto.createHash('sha256').update(content).digest('hex');
+              const stat = fs.statSync(fPath);
+              const evId = `${caseNum}-EV${String(idx + 1).padStart(2, '0')}`;
+
+              db.prepare(`
+                INSERT OR IGNORE INTO evidence_records 
+                (id, case_number, file_name, file_hash, file_size, mime_type, description, submitter_address, current_custodian, tx_hash, block_number, created_at) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME('now'))
+              `).run(
+                evId,
+                caseNum,
+                f,
+                hash,
+                stat.size,
+                f.endsWith('.pdf') ? 'application/pdf' : (f.endsWith('.csv') ? 'text/csv' : 'text/plain'),
+                `Seized Exhibit ${idx + 1}: ${f}`,
+                '0x40386f4ec88bf501a562d4552ef9ff6eadfa69da',
+                '0x40386f4ec88bf501a562d4552ef9ff6eadfa69da',
+                '0x58f79d1a3c749921b0e5672abf8812c3098d667104b998cf1e809314ac618df2',
+                7894561
+              );
+            } catch (fileErr) {}
+          });
+        }
+
+        db.prepare(`
+          INSERT OR IGNORE INTO forensic_reports 
           (case_number, report_title, lab_name, examiner_name, findings, file_name, file_hash, file_size, submitter_address, created_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME('now'))
         `).run(
@@ -198,13 +190,9 @@ function initDatabase() {
           4198,
           '0x40386f4ec88bf501a562d4552ef9ff6eadfa69da'
         );
-      }
 
-      // Seed official Court Ruling into court_reports table
-      const existingCReport = db.prepare('SELECT id FROM court_reports WHERE case_number = ?').get(caseNum);
-      if (!existingCReport) {
         db.prepare(`
-          INSERT INTO court_reports 
+          INSERT OR IGNORE INTO court_reports 
           (case_number, court_name, judge_name, verdict, orders_summary, file_name, file_hash, file_size, submitter_address, created_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME('now'))
         `).run(
