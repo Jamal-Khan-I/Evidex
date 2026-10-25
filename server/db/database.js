@@ -127,8 +127,8 @@ function initDatabase() {
 
       db.prepare(`
         INSERT OR IGNORE INTO cases 
-        (case_number, fir_number, police_station, law_sections, description, registered_by, officer_name, case_key, forensics_requested, forensics_status, court_status, case_status, created_at) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 'PENDING', 'PENDING', 'OPEN', DATETIME('now'))
+        (case_number, fir_number, police_station, law_sections, description, registered_by, officer_name, case_key, forensics_requested, forensics_status, court_status, case_status, created_at, closed_at) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 'SUBMITTED', 'CLOSED', 'CLOSED', DATETIME('now'), DATETIME('now'))
       `).run(
         caseNum,
         firNum,
@@ -139,6 +139,13 @@ function initDatabase() {
         'Inspector Vikramaditya Rathore',
         'E7qci6ybOpKWAN7xJJyRoL133lthzj'
       );
+
+      // If already inserted, ensure status reflects the submitted reports
+      db.prepare(`
+        UPDATE cases 
+        SET forensics_status = 'SUBMITTED', court_status = 'CLOSED', case_status = 'CLOSED', closed_at = COALESCE(closed_at, DATETIME('now'))
+        WHERE case_number = ?
+      `).run(caseNum);
 
       const crypto = require('crypto');
       const testDir = path.resolve(__dirname, '../../test_case_files');
@@ -171,6 +178,46 @@ function initDatabase() {
             );
           } catch (fileErr) {}
         });
+      }
+
+      // Seed official Forensic Lab Report into forensic_reports table
+      const existingFReport = db.prepare('SELECT id FROM forensic_reports WHERE case_number = ?').get(caseNum);
+      if (!existingFReport) {
+        db.prepare(`
+          INSERT INTO forensic_reports 
+          (case_number, report_title, lab_name, examiner_name, findings, file_name, file_hash, file_size, submitter_address, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME('now'))
+        `).run(
+          caseNum,
+          'CFSL Forensic Laboratory Examination & Scientific Analysis Report (CFSL/CYBER/2026/REP-0419)',
+          'Central Forensic Science Laboratory (CFSL), CBI Complex, New Delhi',
+          'Dr. S. Ramanathan, Principal Scientific Officer (Cyber Forensics)',
+          'Acoustic & Voice Biometric Analysis confirmed 99.8% probability of algorithmic neural deepfake voice generation used to impersonate Law Enforcement Officers. SIM-Box firmware reverse engineering revealed automated IVR calls mimicking DoT warnings. Crypto tracing linked ₹4.85 Crore laundering trail to Southeast Asian syndicate.',
+          'Exhibit_E_Forensic_Lab_Report_CFSL_CASE-2026-001.pdf',
+          '0x3da2255fa224418e224418e224418e224418e224418e224418e224418e224418',
+          4198,
+          '0x40386f4ec88bf501a562d4552ef9ff6eadfa69da'
+        );
+      }
+
+      // Seed official Court Ruling into court_reports table
+      const existingCReport = db.prepare('SELECT id FROM court_reports WHERE case_number = ?').get(caseNum);
+      if (!existingCReport) {
+        db.prepare(`
+          INSERT INTO court_reports 
+          (case_number, court_name, judge_name, verdict, orders_summary, file_name, file_hash, file_size, submitter_address, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME('now'))
+        `).run(
+          caseNum,
+          'Principal Sessions Court, Special CBI Cyber Court, Patiala House Courts, New Delhi',
+          'Hon\'ble Justice K. Srinivasan, Principal Sessions Judge',
+          'CONVICTION',
+          'Accused No. 1 (Rajesh Varma) convicted under BNS 318(4), 336(3), IT Act 66D to 7 years RI and ₹25 Lakh fine. Accused No. 2 (Sunil Kumar) convicted to 4 years RI. Restitution of ₹4.85 Crore ordered restored to victim. Case Dossier CASE-2026-001 marked officially CLOSED and immutably archived on blockchain.',
+          'Exhibit_F_Judicial_Order_Verdict_Sessions_Court_CASE-2026-001.pdf',
+          '0x1ed3c33c3b8697323b8697323b8697323b8697323b8697323b8697323b869732',
+          3276,
+          '0x40386f4ec88bf501a562d4552ef9ff6eadfa69da'
+        );
       }
     } catch (seedCaseErr) {
       console.warn('[Database] Case seed notice:', seedCaseErr.message);
