@@ -168,6 +168,12 @@
             <button type="button" class="ai-icon-btn active" id="aiAudioToggleBtn" title="Toggle Voice/Sound">
               🔊
             </button>
+            <button type="button" class="ai-icon-btn" id="aiHeaderPauseBtn" title="Pause / Resume" style="font-size:12px;">
+              ⏸
+            </button>
+            <button type="button" class="ai-icon-btn" id="aiHeaderStopBtn" title="Stop" style="font-size:12px; color:#ef4444;">
+              ⏹
+            </button>
             <button type="button" class="ai-icon-btn" id="aiCloseBoxBtn" title="Close Dialogue">
               ✕
             </button>
@@ -189,9 +195,6 @@
         <div class="ai-suggestions-bar" id="aiSuggestionsBar">
           <button type="button" class="ai-chip primary-chip" data-query="Explain the detailed summary and forensic dossier of the last case that was registered">
             📋 Details of Last Case
-          </button>
-          <button type="button" class="ai-chip" data-query="Summarize all registered cases">
-            📁 All Cases Summary
           </button>
           <button type="button" class="ai-chip" data-query="Are there any pending forensic reports?">
             🧪 Forensic Reports
@@ -588,10 +591,151 @@
     if (thinkingEl) thinkingEl.remove();
   }
 
-  // ── EVIDEX AI INDIAN ENGLISH VOICE SYSTEM ──
+  // ── EVIDEX AI NATURAL INDIAN SPEECH & ROBUST CHUNKING ENGINE ──
   let aiVoiceAudioPlayer = null;
+  let speechHeartbeatTimer = null;
+  let activeSpeechUtterance = null;
+  let currentSpeechQueue = [];
+  let currentSpeechIdx = 0;
+
+  function cleanTextForSpeech(text) {
+    if (!text) return '';
+    let s = String(text);
+
+    // Strip HTML tags
+    s = s.replace(/<[^>]*>/g, ' ');
+
+    // Strip Unicode emojis and special symbols
+    s = s.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}]/gu, ' ');
+    s = s.replace(/[📖📋📁🧪⚖️🔊✓✗•▪▫■□►▶⏸⏹🔍⚡✉️💡👉⚠️]/g, ' ');
+    s = s.replace(/&bull;|&middot;|&amp;/g, ' and ');
+
+    // Case and FIR number pronunciations (say "Case 2026 001", not "Case dash...")
+    s = s.replace(/(?:Case\s+)?CASE-(\d{4})-(\d+)/gi, 'Case $1 $2');
+    s = s.replace(/FIR\s*No\.?\s*(\d+)\/(\d+)/gi, 'FIR number $1 of $2');
+    s = s.replace(/(\d+)\/(\d{4})/g, '$1 of $2');
+
+    // Legal sections: 318(4) -> 318 subsection 4
+    s = s.replace(/(\d+)\((\d+)\)/g, '$1 subsection $2');
+    s = s.replace(/\bSec\.?\s*(\d+)/gi, 'Section $1');
+
+    // Replace slashes, pipes, and ampersands with natural words
+    s = s.replace(/\s*\|\s*/g, ', and ');
+    s = s.replace(/\s*\/\s*/g, ', and ');
+    s = s.replace(/\s*&\s*/g, ' and ');
+    s = s.replace(/\s*@\s*/g, ' at ');
+    s = s.replace(/%/g, ' percent');
+
+    // Clean all dashes (hyphen, en-dash, em-dash, bullet dash) into clean pauses or spaces
+    s = s.replace(/\s*[—–]\s*/g, ', ');
+    s = s.replace(/(?:^|\n)\s*[-*•]\s+/g, ', ');
+    s = s.replace(/\s+-\s+/g, ', ');
+    s = s.replace(/([a-zA-Z0-9]+)-([a-zA-Z0-9]+)/g, '$1 $2');
+
+    // Remove markdown formatting chars
+    s = s.replace(/[*#_`~\[\]]/g, ' ');
+
+    // Chapters
+    s = s.replace(/\bChapter\s+I\b/gi, 'Chapter 1');
+    s = s.replace(/\bChapter\s+II\b/gi, 'Chapter 2');
+    s = s.replace(/\bChapter\s+III\b/gi, 'Chapter 3');
+    s = s.replace(/\bChapter\s+IV\b/gi, 'Chapter 4');
+
+    // Expansions for natural Indian English pronunciation
+    s = s.replace(/\bBNS\b/g, 'B N S');
+    s = s.replace(/\bBNSS\b/g, 'B N S S');
+    s = s.replace(/\bBSA\b/g, 'B S A');
+    s = s.replace(/\bIT Act\b/g, 'I T Act');
+    s = s.replace(/\bCFSL\b/g, 'C F S L');
+    s = s.replace(/\bFSL\b/g, 'F S L');
+    s = s.replace(/\bFIR\b/g, 'F I R');
+    s = s.replace(/\bSHA-256\b/gi, 'S H A 256');
+    s = s.replace(/\bDoT\b/g, 'Department of Telecommunications');
+    s = s.replace(/\bIVR\b/g, 'I V R');
+    s = s.replace(/\bSIM\b/gi, 'sim');
+    s = s.replace(/\bUSDT\b/gi, 'U S D T');
+    s = s.replace(/\bTRC-20\b/gi, 'T R C 20');
+    s = s.replace(/₹\s*([0-9,]+)/g, '$1 rupees');
+    s = s.replace(/Rs\.?\s*([0-9,]+)/gi, '$1 rupees');
+
+    // Quotes and colons
+    s = s.replace(/[\"'\u201C\u201D\u2018\u2019]/g, '');
+    s = s.replace(/:/g, '. ');
+
+    // Normalize spacing and punctuation
+    s = s.replace(/,\s*,+/g, ',');
+    s = s.replace(/\.\s*\.+/g, '.');
+    s = s.replace(/[ \t]+/g, ' ');
+    s = s.replace(/\n\s*\n+/g, '\n');
+
+    return s.trim();
+  }
+
+  function splitTextIntoSpeechSentences(text, maxLen = 150) {
+    if (!text) return [];
+    const rawSegments = text.split(/(?<=[.?!])\s+|\n+/).map(s => s.trim()).filter(Boolean);
+    const chunks = [];
+    for (const segment of rawSegments) {
+      if (segment.length <= maxLen) {
+        chunks.push(segment);
+      } else {
+        const subParts = segment.split(/(?<=[,;])\s+/);
+        let current = '';
+        for (const part of subParts) {
+          if (!current) {
+            current = part;
+          } else if ((current + ' ' + part).length <= maxLen) {
+            current += ' ' + part;
+          } else {
+            chunks.push(current.trim());
+            current = part;
+          }
+        }
+        if (current.trim()) {
+          if (current.length > maxLen) {
+            const words = current.split(/\s+/);
+            let wChunk = '';
+            for (const w of words) {
+              if ((wChunk + ' ' + w).length <= maxLen) {
+                wChunk += (wChunk ? ' ' : '') + w;
+              } else {
+                if (wChunk) chunks.push(wChunk);
+                wChunk = w;
+              }
+            }
+            if (wChunk) chunks.push(wChunk);
+          } else {
+            chunks.push(current.trim());
+          }
+        }
+      }
+    }
+    return chunks.filter(c => c.length > 0);
+  }
+
+  function startSpeechHeartbeat() {
+    stopSpeechHeartbeat();
+    speechHeartbeatTimer = setInterval(() => {
+      if (window.speechSynthesis && window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+        window.speechSynthesis.pause();
+        window.speechSynthesis.resume();
+      }
+    }, 7000);
+  }
+
+  function stopSpeechHeartbeat() {
+    if (speechHeartbeatTimer) {
+      clearInterval(speechHeartbeatTimer);
+      speechHeartbeatTimer = null;
+    }
+  }
 
   function stopAiVoice() {
+    stopSpeechHeartbeat();
+    isVoiceSpeaking = false;
+    currentSpeechQueue = [];
+    currentSpeechIdx = 0;
+
     if (aiVoiceAudioPlayer) {
       try {
         aiVoiceAudioPlayer.pause();
@@ -599,10 +743,41 @@
       } catch (e) {}
       aiVoiceAudioPlayer = null;
     }
+
     if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
+      try {
+        window.speechSynthesis.cancel();
+      } catch (e) {}
     }
-    isVoiceSpeaking = false;
+
+    window._evidexUtterances = [];
+
+    const pauseBtn = document.getElementById('aiHeaderPauseBtn');
+    if (pauseBtn) pauseBtn.innerHTML = '⏸';
+  }
+
+  function toggleSpeechPause() {
+    const pauseBtn = document.getElementById('aiHeaderPauseBtn');
+    if (aiVoiceAudioPlayer) {
+      if (aiVoiceAudioPlayer.paused) {
+        aiVoiceAudioPlayer.play();
+        if (pauseBtn) pauseBtn.innerHTML = '⏸';
+      } else {
+        aiVoiceAudioPlayer.pause();
+        if (pauseBtn) pauseBtn.innerHTML = '▶';
+      }
+      return;
+    }
+
+    if ('speechSynthesis' in window) {
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+        if (pauseBtn) pauseBtn.innerHTML = '⏸';
+      } else if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.pause();
+        if (pauseBtn) pauseBtn.innerHTML = '▶';
+      }
+    }
   }
 
   function getIndianSpeechVoice() {
@@ -626,162 +801,82 @@
     return naturalEn || voices.find(v => v.lang.startsWith('en')) || voices[0];
   }
 
-  async function speakAssistantVoice(plainText, onEnd = null) {
+  function speakAssistantVoice(rawText, onEnd = null) {
     if (!isSoundEnabled) return;
     stopAiVoice();
 
-    const cleanText = plainText.replace(/[*#_`]/g, '').trim();
-    if (!cleanText) return;
+    const cleaned = cleanTextForSpeech(rawText);
+    if (!cleaned) return;
 
-    // Try high-fidelity server-side neural Indian English TTS first (up to 650 characters)
-    if (cleanText.length <= 650) {
+    if (!('speechSynthesis' in window)) return;
+
+    const chunks = splitTextIntoSpeechSentences(cleaned, 150);
+    if (chunks.length === 0) return;
+
+    currentSpeechQueue = chunks;
+    currentSpeechIdx = 0;
+    isVoiceSpeaking = true;
+    window._evidexUtterances = [];
+
+    const voice = getIndianSpeechVoice();
+    startSpeechHeartbeat();
+
+    function speakNext() {
+      if (!isVoiceSpeaking) return;
+      if (currentSpeechIdx >= currentSpeechQueue.length) {
+        stopSpeechHeartbeat();
+        isVoiceSpeaking = false;
+        window._evidexUtterances = [];
+        const pauseBtn = document.getElementById('aiHeaderPauseBtn');
+        if (pauseBtn) pauseBtn.innerHTML = '⏸';
+        if (onEnd) onEnd();
+        return;
+      }
+
+      const segment = currentSpeechQueue[currentSpeechIdx++];
       try {
-        const ttsFn = (window.epsApi && window.epsApi.generateIndianTts)
-          ? window.epsApi.generateIndianTts
-          : (window.epsApi && window.epsApi.generateJarvisTts);
-        if (typeof ttsFn === 'function') {
-          const res = await ttsFn(cleanText);
-          if (res && res.success && res.audioUrl) {
-            isVoiceSpeaking = true;
-            const audio = new Audio(res.audioUrl);
-            aiVoiceAudioPlayer = audio;
-            audio.onended = () => {
-              isVoiceSpeaking = false;
-              aiVoiceAudioPlayer = null;
-              if (onEnd) onEnd();
-            };
-            audio.onerror = () => {
-              aiVoiceAudioPlayer = null;
-              fallbackWebSpeechIndian(cleanText, onEnd);
-            };
-            await audio.play();
+        const utter = new SpeechSynthesisUtterance(segment);
+        if (voice) utter.voice = voice;
+        utter.pitch = 1.0;
+        utter.rate = 1.0;
+
+        // Prevent Chrome V8 garbage collection
+        window._evidexUtterances.push(utter);
+        activeSpeechUtterance = utter;
+
+        utter.onend = () => {
+          speakNext();
+        };
+
+        utter.onerror = (err) => {
+          if (err.error === 'canceled' || !isVoiceSpeaking) {
             return;
           }
-        }
+          setTimeout(speakNext, 50);
+        };
+
+        window.speechSynthesis.speak(utter);
       } catch (err) {
-        // Fallback to client synthesis
+        speakNext();
       }
     }
 
-    fallbackWebSpeechIndian(cleanText, onEnd);
-  }
-
-  function fallbackWebSpeechIndian(cleanText, onEnd = null) {
-    if (!('speechSynthesis' in window)) return;
-    try {
-      window.speechSynthesis.cancel();
-      const utter = new SpeechSynthesisUtterance(cleanText);
-      const voice = getIndianSpeechVoice();
-      if (voice) utter.voice = voice;
-      // Clear, natural, articulate pronunciation (normal pitch 1.0, natural pace 1.0)
-      utter.pitch = 1.0; 
-      utter.rate = 1.0;
-      isVoiceSpeaking = true;
-      activeSpeechUtterance = utter;
-
-      utter.onend = () => {
-        isVoiceSpeaking = false;
-        if (onEnd) onEnd();
-      };
-      utter.onerror = () => {
-        isVoiceSpeaking = false;
-      };
-      window.speechSynthesis.speak(utter);
-    } catch (e) {
-      isVoiceSpeaking = false;
-    }
+    speakNext();
   }
 
   function speakStoryText(plainText, storyControlsContainer) {
     if (!isSoundEnabled) return;
     stopAiVoice();
 
-    const cleanText = plainText.replace(/[*#_]/g, '').trim();
-    if (!cleanText) return;
-
     if (storyControlsContainer) {
-      storyControlsContainer.innerHTML = `
-        <span>🔊 Narrating case with Evidex AI voice...</span>
-        <div style="display:flex; gap:6px;">
-          <button type="button" class="ai-voice-btn-pill" id="aiPauseStoryBtn">⏸ Pause</button>
-          <button type="button" class="ai-voice-btn-pill danger" id="aiStopStoryBtn">⏹ Stop</button>
-        </div>
-      `;
-
-      const pauseBtn = storyControlsContainer.querySelector('#aiPauseStoryBtn');
-      const stopBtn = storyControlsContainer.querySelector('#aiStopStoryBtn');
-
-      if (pauseBtn) {
-        pauseBtn.addEventListener('click', () => {
-          if (aiVoiceAudioPlayer) {
-            if (aiVoiceAudioPlayer.paused) {
-              aiVoiceAudioPlayer.play();
-              pauseBtn.textContent = '⏸ Pause';
-            } else {
-              aiVoiceAudioPlayer.pause();
-              pauseBtn.textContent = '▶ Resume';
-            }
-          } else if (window.speechSynthesis) {
-            if (window.speechSynthesis.paused) {
-              window.speechSynthesis.resume();
-              pauseBtn.textContent = '⏸ Pause';
-            } else {
-              window.speechSynthesis.pause();
-              pauseBtn.textContent = '▶ Resume';
-            }
-          }
-        });
-      }
-
-      if (stopBtn) {
-        stopBtn.addEventListener('click', () => {
-          stopAiVoice();
-          storyControlsContainer.innerHTML = `<span>⏹ Narration stopped.</span>`;
-        });
-      }
+      storyControlsContainer.innerHTML = `<span>🔊 Narrating case dossier...</span>`;
     }
 
-    // Split story into natural paragraphs/sentences so each segment is synthesized via high-fidelity neural Indian English TTS
-    const paragraphs = cleanText.split(/\n+/).map(p => p.trim()).filter(Boolean);
-    const chunks = [];
-    for (const p of paragraphs) {
-      if (p.length <= 400) {
-        chunks.push(p);
-      } else {
-        const sentences = p.match(/[^.!?]+[.!?]+(\s|$)|[^.!?]+$/g) || [p];
-        let cur = '';
-        for (const s of sentences) {
-          if ((cur + s).length <= 400) {
-            cur += s;
-          } else {
-            if (cur) chunks.push(cur.trim());
-            cur = s;
-          }
-        }
-        if (cur) chunks.push(cur.trim());
+    speakAssistantVoice(plainText, () => {
+      if (storyControlsContainer) {
+        storyControlsContainer.innerHTML = `<span>✓ Case narration complete.</span>`;
       }
-    }
-
-    let chunkIdx = 0;
-    isVoiceSpeaking = true;
-
-    async function playNextChunk() {
-      if (!isVoiceSpeaking) return;
-      if (chunkIdx >= chunks.length) {
-        isVoiceSpeaking = false;
-        if (storyControlsContainer) {
-          storyControlsContainer.innerHTML = `<span>✓ Case narration complete.</span>`;
-        }
-        return;
-      }
-
-      const textToPlay = chunks[chunkIdx++];
-      await speakAssistantVoice(textToPlay, () => {
-        playNextChunk();
-      });
-    }
-
-    playNextChunk();
+    });
   }
 
   function stopStoryVoice() {
@@ -1047,8 +1142,24 @@
         audioBtn.classList.toggle('active', isSoundEnabled);
         audioBtn.innerHTML = isSoundEnabled ? '🔊' : '🔇';
         if (!isSoundEnabled) {
-          stopStoryVoice();
+          stopAiVoice();
         }
+      });
+    }
+
+    const pauseBtn = document.getElementById('aiHeaderPauseBtn');
+    if (pauseBtn) {
+      pauseBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleSpeechPause();
+      });
+    }
+
+    const stopBtn = document.getElementById('aiHeaderStopBtn');
+    if (stopBtn) {
+      stopBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        stopAiVoice();
       });
     }
 
