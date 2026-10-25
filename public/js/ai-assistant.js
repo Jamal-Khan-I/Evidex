@@ -148,6 +148,8 @@
 
     const widget = document.createElement('div');
     widget.id = 'evidexAiWidget';
+    widget.className = 'visible';
+    widget.style.display = 'block';
     widget.innerHTML = `
       <!-- Light Theme RPG Game Dialogue Box -->
       <div id="aiDialogueBox" role="dialog" aria-label="Evidex AI Assistant">
@@ -594,7 +596,6 @@
   // ── EVIDEX AI NATURAL INDIAN SPEECH & ROBUST CHUNKING ENGINE ──
   let aiVoiceAudioPlayer = null;
   let speechHeartbeatTimer = null;
-  let activeSpeechUtterance = null;
   let currentSpeechQueue = [];
   let currentSpeechIdx = 0;
 
@@ -1225,44 +1226,18 @@
       .replace(/'/g, '&#039;');
   }
 
-  // ── VISIBILITY LOGIC (NOT PRESENT ON STARTING PAGE) ──
+  // ── VISIBILITY LOGIC (ALWAYS VISIBLE AT BOTTOM) ──
   function updateAiWidgetVisibility() {
     const widget = document.getElementById('evidexAiWidget');
     if (!widget) return;
-
-    const landing = document.getElementById('landingPage');
-    const app = document.getElementById('appContent');
-
-    const isLandingVisible = landing && (landing.style.display !== 'none' && window.getComputedStyle(landing).display !== 'none');
-    const isAppVisible = app && (app.style.display !== 'none' && window.getComputedStyle(app).display !== 'none');
-
-    if (!isLandingVisible && isAppVisible) {
-      widget.classList.add('visible');
-      widget.style.display = 'block';
-    } else {
-      widget.classList.remove('visible');
-      widget.style.display = 'none';
-      closeDialogueBox();
-    }
+    widget.classList.add('visible');
+    widget.style.display = 'block';
+    widget.style.opacity = '1';
+    widget.style.visibility = 'visible';
   }
 
   function setupVisibilityObserver() {
     updateAiWidgetVisibility();
-
-    const landing = document.getElementById('landingPage');
-    const app = document.getElementById('appContent');
-
-    const observer = new MutationObserver(() => {
-      updateAiWidgetVisibility();
-    });
-
-    if (landing) {
-      observer.observe(landing, { attributes: true, attributeFilter: ['style', 'class'] });
-    }
-    if (app) {
-      observer.observe(app, { attributes: true, attributeFilter: ['style', 'class'] });
-    }
-
     window.addEventListener('popstate', updateAiWidgetVisibility);
     window.addEventListener('hashchange', updateAiWidgetVisibility);
   }
