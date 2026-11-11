@@ -10,7 +10,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?style=for-the-badge&logo=node.js)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 
-*An institutional-grade, tamper-proof digital evidence registry and forensic workflow platform bridging Section 61 of the Bharatiya Sakshya Adhiniyam (BSA 2023) / Section 65B of the Indian Evidence Act with Ethereum smart contracts, client-side cryptographic hashing, biometric face authentication, e-Aadhaar UIDAI verification, and an intelligent legal voice assistant.*
+*An institutional-grade, tamper-proof digital evidence registry and forensic workflow platform bridging Section 61 of the Bharatiya Sakshya Adhiniyam (BSA 2023) / Section 65B of the Indian Evidence Act with Ethereum smart contracts, client-side cryptographic hashing, webcam face capture, e-Aadhaar UIDAI verification, and an intelligent legal voice assistant.*
 
 [Key Features](#-key-features) • [End-to-End Workflow](#-end-to-end-website-workflow) • [Evidex AI Assistant](#-evidex-ai-assistant) • [Architecture](#-architecture) • [Smart Contract Specifications](#-smart-contract-specifications) • [REST API Reference](#-rest-api-reference) • [Security & Admissibility](#-security--legal-admissibility)
 
@@ -29,15 +29,15 @@ In contemporary criminal investigations, digital exhibits—such as CCTV camera 
 **Evidex** establishes a decentralized, mathematically verifiable chain of custody:
 1. Digital exhibits are fingerprinted client-side with **SHA-256** inside the investigator's browser before upload.
 2. File fingerprints and custody handovers are permanently anchored on an **Ethereum EVM smart contract**.
-3. Officer onboarding requires **cryptographic wallet authentication, webcam biometric face matching, security PIN, and automated e-Aadhaar PDF verification**.
-4. An integrated **Evidex AI Assistant** provides voice-narrated case summaries, forensic status checks, and legal advice grounded in Indian criminal statutes (BNS, BNSS, BSA, IT Act).
+3. Officer onboarding requires **cryptographic MetaMask wallet connection, live webcam face capture with passport-guide alignment, official service details, and automated e-Aadhaar PDF cross-verification**.
+4. An integrated **Evidex AI Assistant** provides voice-narrated case summaries, forensic status checks, and legal guidance grounded in Indian criminal statutes (BNS, BNSS, BSA, IT Act).
 
 ---
 
 ## 🌟 Key Features
 
 * **Role-Based Access Control (RBAC):** Dedicated, secure workspace interfaces tailored for **Police Investigators**, **Forensic Science Laboratories (FSL)**, **Judicial Courts**, and **Department Administrators**.
-* **Biometric Face Recognition & Liveness:** Client-side 128-dimensional facial vector landmark extraction powered by `face-api.js` (SSD MobileNet V1). Raw webcam frames are processed exclusively in RAM and never stored.
+* **Live Webcam Face Capture:** Built-in passport-guide oval framing with digital face zoom (1.0x to 2.8x) that isolates and crops strictly to the officer's face for departmental credentials.
 * **UIDAI e-Aadhaar Automated Verification:** Server-side decryption of password-protected official e-Aadhaar PDFs with fuzzy string cross-matching (Levenshtein distance & token overlap) to eliminate fraudulent onboarding.
 * **Client-Side SHA-256 Integrity Fingerprinting:** Files generate a 64-character hexadecimal digest on-device using the Web Cryptography API before any network transfer.
 * **Immutable On-Chain Custody Ledger:** Gas-optimized batch registration and custody handovers with permanent on-chain timestamps on Ethereum Sepolia.
@@ -57,25 +57,29 @@ Evidex mirrors the complete real-world legal lifecycle of an investigation from 
 │                                       EVIDEX END-TO-END WORKFLOW                                       │
 └────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
-  [ Step 1: Officer Onboarding & Biometrics ]
+  [ Step 1: Officer Onboarding & Identity Application ]
          │
          ├── Connect MetaMask digital wallet (Public address serves as officer identity key)
-         ├── Fill official officer profile (Name, Badge Number, Department, Mobile, Email)
-         ├── Webcam Biometric Face Scan (Generates 128-dimensional facial descriptor vector)
+         ├── Fill official officer profile (Name, Gender, DOB, Mobile, Official Email)
+         ├── Select Service Role & Department Details:
+         │     • Police: Police Station Name/Code, District, Badge Number, Rank
+         │     • Forensics: Forensic Lab Name & ID, Accreditation No, Specialization
+         │     • Court: Court Complex & Jurisdiction, Judicial Designation
+         ├── Live Webcam Face Capture (Interactive passport guide oval with digital zoom)
          ├── Upload e-Aadhaar PDF (Auto-cracks UIDAI password formula & validates identity)
-         └── Set 6-digit security PIN
+         └── Submit access application for Department Administrator review
          │
          ▼
   [ Step 2: Department Administrator Approval ]
          │
-         ├── Department Chief / Admin inspects pending registration queue
-         ├── Validates Aadhaar tamper confidence score and identity credentials
-         └── Executes on-chain role grant: POLICE, FORENSIC LAB, or COURT JUDGE
+         ├── Department Chief / Admin logs into the Administration workspace
+         ├── Inspects pending officer access requests and Aadhaar tamper confidence scores
+         └── Executes on-chain authorization: POLICE, FORENSIC LAB, or COURT JUDGE
          │
          ▼
   [ Step 3: Police Case Registration & Digital Evidence Seizure ]
          │
-         ├── Police officer logs in via Wallet + Face Scan + PIN
+         ├── Police officer connects authorized MetaMask wallet
          ├── Opens "Register Case" form: enters Case Number, FIR Number, Station, & Sections
          ├── Uploads seized digital evidence (CCTV footage, call logs, bank transaction CSVs)
          ├── Browser calculates SHA-256 on-device -> Pins to IPFS -> Anchors hash on-chain
@@ -84,7 +88,7 @@ Evidex mirrors the complete real-world legal lifecycle of an investigation from 
          ▼
   [ Step 4: Forensic Science Laboratory (FSL) Examination ]
          │
-         ├── Forensic Scientist logs in to the FSL workspace
+         ├── Forensic Scientist logs in with authorized wallet to the FSL workspace
          ├── Inspects pending cases and downloads original, tamper-proof exhibits
          ├── Performs forensic tests (audio frequency analysis, device extraction, deepfake scan)
          ├── Clicks "Submit Lab Report", uploads signed findings, and signs on-chain
@@ -93,7 +97,7 @@ Evidex mirrors the complete real-world legal lifecycle of an investigation from 
          ▼
   [ Step 5: Judicial Court Trial & Case Sealing ]
          │
-         ├── Judge logs in to the Court workspace
+         ├── Judge logs in with authorized wallet to the Court workspace
          ├── Inspects complete case docket: initial police evidence, FIR, and verified FSL report
          ├── Clicks "Verify Integrity" — system matches live disk file hash with on-chain hash
          ├── Confirms zero tamper alerts (Section 61 BSA / 65B Evidence Act compliance)
@@ -125,7 +129,7 @@ Evidex features an in-app AI legal assistant located in the workspace:
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │                                 Client Browser (SPA)                                   │
 │  • Pure Vanilla JavaScript (ES6+), Modern HTML5, Responsive Glassmorphic CSS          │
-│  • Biometric Face Recognition (face-api.js 128D Vectors) + Security PIN Verification   │
+│  • Live Webcam Face Capture with Passport Framing & Digital Zoom Control               │
 │  • Web Crypto API: On-Device SHA-256 Hashing & Integrity Calculation                  │
 │  • Floating Evidex AI Assistant (Speech Synthesis & Voice Recognition)                 │
 │  • Web3 Provider (Ethers.js / MetaMask Wallet Signing)                                │
@@ -189,7 +193,7 @@ Evidex features an in-app AI legal assistant located in the workspace:
 * `POST /api/evidence/verify` — Compare file bytes against recorded SHA-256 hash to detect bit rot or tampering.
 
 ### Authentication & Biometric Onboarding
-* `POST /api/auth/register-request` — Submit new officer application with biometric face descriptor.
+* `POST /api/auth/register-request` — Submit new officer application with captured face photo and department credentials.
 * `POST /api/auth/verify-aadhaar` — Decrypt and validate e-Aadhaar PDF against officer form fields.
 * `POST /api/auth/send-otp` / `POST /api/auth/verify-otp` — Email OTP dispatch and verification.
 * `GET /api/auth/registration-requests` — Admin queue of pending officer applications.
@@ -199,8 +203,8 @@ Evidex features an in-app AI legal assistant located in the workspace:
 ## 🔒 Security & Legal Admissibility
 
 1. **Statutory Admissibility (BSA 2023 / Section 65B):** The combination of on-device SHA-256 calculation, decentralized timestamping, and smart contract audit logs satisfies legal standards for electronic record integrity.
-2. **Zero Plaintext Key Storage:** Private keys, seed phrases, and officer PINs are never stored on any backend database.
-3. **Biometric Privacy by Design:** Facial scans are translated into 128-dimensional mathematical floating-point vectors in browser RAM using WebGL. Video feeds and raw facial images are immediately discarded.
+2. **Zero Plaintext Private Key Exposure:** Private keys and seed phrases remain securely inside the officer's MetaMask vault and are never accessed by the application server.
+3. **Face Capture & Privacy by Design:** The onboarding webcam tool crops strictly to the officer's face frame for official identification badges, discarding unnecessary background and body surroundings.
 4. **Tamper Incident Detection:** Any alteration of even a single byte within an exhibit alters its SHA-256 hash. The system immediately flags the file, blocks courtroom admission, and logs a tamper alert into `tamper_incidents`.
 
 ---
