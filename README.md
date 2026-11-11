@@ -1,7 +1,7 @@
 <div align="center">
 
 # <img width="52" height="47" alt="image" src="https://github.com/user-attachments/assets/becf57fe-3c2e-4e7b-a541-07fb72fe0b43" />
-EVIDEX
+**EVIDEX**
 
 **Decentralized Digital Evidence Protection & Forensic Chain of Custody System**
 
