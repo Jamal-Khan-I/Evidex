@@ -10,7 +10,6 @@
 [![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?style=for-the-badge&logo=node.js)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 
-*An institutional-grade, tamper-proof digital evidence registry and forensic chain-of-custody platform bridging Section 61 of the Bharatiya Sakshya Adhiniyam (BSA 2023) / Section 65B of the Indian Evidence Act with Ethereum smart contracts, client-side cryptographic hashing, live webcam face capture, automated e-Aadhaar verification, and an intelligent legal voice assistant.*
 
 [Workflow](#-workflow) • [Key Features](#-key-features) • [Floating AI Assistant](#-floating-ai-assistant) • [Architecture](#-architecture) • [Smart Contract Specifications](#-smart-contract-specifications) • [REST API Reference](#-rest-api-reference) • [Security & Admissibility](#-security--legal-admissibility)
 
@@ -32,48 +31,6 @@ In contemporary criminal investigations, digital exhibits—such as CCTV camera 
 
 ## 🔄 Workflow
 
-```
-┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                       EVIDEX COMPLETE WORKFLOW                                         │
-└────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-  [ Step 1: Sign-Up ]
-  The officer fills in an identity form in the website with name, department, badge number,
-  and the wallet address to be used. The officer then captures a live photo with the webcam
-  and uploads the official e-Aadhaar document, which is then verified for its digital signature
-  in the website.
-         │
-         ▼
-  [ Step 2: Approval ]
-  Request including a picture and a signed document is reviewed by the administrator who
-  approves or denies. An officer receives an e-mail and an approved wallet is assigned its
-  responsibility.
-         │
-         ▼
-  [ Step 3: Case Registration ]
-  The police officer provides the case number, FIR number, police station, sections of law,
-  a description etc. and marks one or more evidence files and may demand for a laboratory
-  examination. Each file is fingerprinted and encrypted by the browser and then uploaded to IPFS;
-  the fingerprint and details is only recorded by the contract in one step. Case turns into
-  ‘open’ with lab report pending.
-         │
-         ▼
-  [ Step 4: Laboratory Examination ]
-  The forensic scientist views the case in the pending list, reviews the case files, and updates
-  the findings and uploads the signed report. The report is saved on the chain and the case
-  becomes report filed.
-         │
-         ▼
-  [ Step 5: Court ]
-  The judge reads through the case dossier that includes the evidence with its fingerprints,
-  the custodians, the laboratory report and the entire timeline. The judge enters the order,
-  adds the signed order and the case is closed. The case is then no longer subject to further
-  custody changes and any user who has access to the case can download the entire case as a
-  ZIP file. Floating AI assistant explains in human language in text or voice, but does not
-  change records.
-```
-
-### Detailed Stage Breakdown:
 
 * **Step 1: Sign-Up**  
   The officer fills in an identity form on the website with name, department, badge number, and the wallet address to be used. The officer then captures a live photo with the webcam and uploads the official e-Aadhaar document, which is verified for its digital signature directly on the website.
